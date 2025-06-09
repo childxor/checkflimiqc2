@@ -278,40 +278,6 @@ Public Class frmMenu
         Return CallNextHookEx(_hookID, nCode, wParam, lParam)
     End Function
 
-    Private Sub ProcessBarcode(barcode As String)
-        ' ดึงข้อมูลส่วนที่ต้องการจาก QR code
-        Dim extractedData As String = barcode
-
-        If autoExtract Then
-            extractedData = ExtractProductCode(barcode)
-        End If
-
-        ' แสดงผลในกล่องข้อความ
-        Me.Invoke(Sub()
-                      Dim txtBarcode = CType(Me.Controls.Find("txtBarcode", True).FirstOrDefault(), TextBox)
-                      If txtBarcode IsNot Nothing Then
-                          txtBarcode.Text = extractedData
-                      End If
-
-                      ' เล่นเสียงหากเปิดใช้งาน
-                      If soundEnabled Then
-                          PlaySystemSound()
-                      End If
-
-                      ' แสดงข้อความแจ้งเตือน
-                      If showFullData Then
-                          MessageBox.Show($"QR Code ทั้งหมด: {barcode}{vbNewLine}{vbNewLine}ข้อมูลที่ดึงออกมา: {extractedData}",
-                                        "ผลการแสกน QR Code",
-                                        MessageBoxButtons.OK,
-                                        MessageBoxIcon.Information)
-                      Else
-                          UpdateStatusBar($"สแกนสำเร็จ: {extractedData}")
-                      End If
-
-                      ' บันทึก log หากเปิดใช้งาน
-                      WriteLog($"Scanned: {barcode} -> Extracted: {extractedData}")
-                  End Sub)
-    End Sub
 
     Private Function ExtractProductCode(qrData As String) As String
         Try
@@ -461,5 +427,272 @@ Public Class frmMenu
 
     Private Sub btnExit_Click(sender As Object, e As EventArgs) Handles btnExit.Click
         ExitApplication(sender, e)
+    End Sub
+
+    ''' <summary>
+    ''' ประมวลผล barcode ที่สแกนได้ พร้อมการตรวจสอบความถูกต้อง
+    ''' </summary>
+    Public Sub ProcessBarcode(barcode As String)
+        Try
+            ' ตรวจสอบความถูกต้องของ barcode ก่อน
+            Dim validation As BarcodeValidationResult = BarcodeValidator.ValidateBarcode(barcode)
+
+            ' เลือกโหมดการดึงข้อมูลตามการตั้งค่า
+            Dim extractionMode As ExtractionMode = GetExtractionMode()
+
+            ' ดึงข้อมูลจาก barcode
+            Dim extractedData As BarcodeExtractedData = BarcodeValidator.ExtractBarcodeData(barcode, extractionMode)
+
+            ' แสดงผลในหน้าจอ
+            Me.Invoke(Sub()
+                          DisplayBarcodeResult(extractedData, validation)
+
+                          ' เล่นเสียงตามผลการตรวจสอบ
+                          If soundEnabled Then
+                              If validation.IsValid Then
+                                  PlaySuccessSound()
+                              ElseIf validation.IsPartiallyValid Then
+                                  PlayWarningSound()
+                              Else
+                                  PlayErrorSound()
+                              End If
+                          End If
+
+                          ' แสดงข้อความแจ้งเตือนตามการตั้งค่า
+                          ShowBarcodeMessage(extractedData, validation)
+
+                          ' บันทึก log
+                          WriteBarcodeLog(extractedData, validation)
+                      End Sub)
+
+        Catch ex As Exception
+            Me.Invoke(Sub()
+                          UpdateStatusBar($"เกิดข้อผิดพลาด: {ex.Message}")
+                          WriteLog($"Error in ProcessBarcode: {ex.Message}")
+                      End Sub)
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' แสดงผลลัพธ์การสแกนในหน้าจอ
+    ''' </summary>
+    Private Sub DisplayBarcodeResult(extractedData As BarcodeExtractedData, validation As BarcodeValidationResult)
+        Try
+            ' อัปเดตข้อความในกล่องข้อความ
+            Dim txtBarcode = CType(Me.Controls.Find("txtBarcode", True).FirstOrDefault(), TextBox)
+            If txtBarcode IsNot Nothing Then
+                txtBarcode.Text = extractedData.ExtractedValue
+
+                ' เปลี่ยนสีตามสถานะ
+                If validation.IsValid Then
+                    txtBarcode.BackColor = Color.LightGreen
+                    txtBarcode.ForeColor = Color.Black
+                ElseIf validation.IsPartiallyValid Then
+                    txtBarcode.BackColor = Color.LightYellow
+                    txtBarcode.ForeColor = Color.Black
+                Else
+                    txtBarcode.BackColor = Color.LightPink
+                    txtBarcode.ForeColor = Color.Black
+                End If
+            End If
+
+            ' อัปเดต status bar
+            Dim statusMessage As String = ""
+            If validation.IsValid Then
+                statusMessage = $"สแกนสำเร็จ: {extractedData.ProductCode}"
+            ElseIf validation.IsPartiallyValid Then
+                statusMessage = $"สแกนสำเร็จ (มีคำเตือน): {extractedData.ProductCode}"
+            Else
+                statusMessage = $"สแกนไม่สมบูรณ์: {extractedData.ExtractedValue}"
+            End If
+
+            UpdateStatusBar(statusMessage)
+
+            ' อัปเดตเวลาการสแกนล่าสุด
+            UpdateLastScanTime()
+
+        Catch ex As Exception
+            WriteLog($"Error in DisplayBarcodeResult: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' แสดงข้อความแจ้งเตือนตามการตั้งค่า
+    ''' </summary>
+    Private Sub ShowBarcodeMessage(extractedData As BarcodeExtractedData, validation As BarcodeValidationResult)
+        Try
+            If showFullData Then
+                Dim message As String = BuildDetailedMessage(extractedData, validation)
+                Dim icon As MessageBoxIcon = MessageBoxIcon.Information
+
+                If Not validation.IsValid Then
+                    icon = MessageBoxIcon.Warning
+                End If
+
+                MessageBox.Show(message, "ผลการสแกน QR Code", MessageBoxButtons.OK, icon)
+            End If
+
+        Catch ex As Exception
+            WriteLog($"Error in ShowBarcodeMessage: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' สร้างข้อความรายละเอียด
+    ''' </summary>
+    Private Function BuildDetailedMessage(extractedData As BarcodeExtractedData, validation As BarcodeValidationResult) As String
+        Dim message As New System.Text.StringBuilder()
+
+        message.AppendLine("=== ผลการสแกน QR Code ===")
+        message.AppendLine()
+
+        ' แสดงข้อมูลที่ดึงออกมา
+        message.AppendLine("ข้อมูลที่ดึงออกมา:")
+        If Not String.IsNullOrEmpty(extractedData.ProductCode) Then
+            message.AppendLine($"  รหัสผลิตภัณฑ์: {extractedData.ProductCode}")
+        End If
+        If Not String.IsNullOrEmpty(extractedData.ReferenceCode) Then
+            message.AppendLine($"  รหัสอ้างอิง: {extractedData.ReferenceCode}")
+        End If
+        If Not String.IsNullOrEmpty(extractedData.Quantity) Then
+            message.AppendLine($"  จำนวน: {extractedData.Quantity}")
+        End If
+        If Not String.IsNullOrEmpty(extractedData.DateCode) Then
+            message.AppendLine($"  วันที่: {extractedData.DateCode}")
+        End If
+
+        message.AppendLine()
+
+        ' แสดงสถานะการตรวจสอบ
+        If validation.IsValid Then
+            message.AppendLine("✅ สถานะ: ข้อมูลถูกต้องสมบูรณ์")
+        ElseIf validation.IsPartiallyValid Then
+            message.AppendLine("⚠️ สถานะ: ข้อมูลถูกต้องบางส่วน")
+        Else
+            message.AppendLine("❌ สถานะ: ข้อมูลไม่สมบูรณ์")
+        End If
+
+        ' แสดงข้อความเตือน (ถ้ามี)
+        If validation.ValidationMessages IsNot Nothing AndAlso validation.ValidationMessages.Count > 0 Then
+            message.AppendLine()
+            message.AppendLine("ข้อความเตือน:")
+            For Each msg As String In validation.ValidationMessages
+                message.AppendLine($"  • {msg}")
+            Next
+        End If
+
+        ' แสดงข้อมูลต้นฉบับ
+        message.AppendLine()
+        message.AppendLine("ข้อมูลต้นฉบับ:")
+        message.AppendLine(extractedData.OriginalData)
+
+        Return message.ToString()
+    End Function
+
+    ''' <summary>
+    ''' ดึงโหมดการ extract ข้อมูลจากการตั้งค่า
+    ''' </summary>
+    Private Function GetExtractionMode() As ExtractionMode
+        Try
+            If File.Exists("Settings.config") Then
+                ' อ่านจากไฟล์ config
+                ' สามารถเพิ่มการตั้งค่านี้ใน frmSettings ได้
+                Return ExtractionMode.Intelligent
+            End If
+        Catch
+            ' ไม่ต้องทำอะไร
+        End Try
+
+        ' ใช้โหมด Intelligent เป็นค่าเริ่มต้น
+        Return ExtractionMode.Intelligent
+    End Function
+
+    ''' <summary>
+    ''' เล่นเสียงสำเร็จ
+    ''' </summary>
+    Private Sub PlaySuccessSound()
+        Try
+            System.Media.SystemSounds.Asterisk.Play()
+        Catch
+            ' fallback เป็นเสียงปกติ
+            System.Media.SystemSounds.Beep.Play()
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' เล่นเสียงเตือน
+    ''' </summary>
+    Private Sub PlayWarningSound()
+        Try
+            System.Media.SystemSounds.Exclamation.Play()
+        Catch
+            System.Media.SystemSounds.Beep.Play()
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' เล่นเสียงผิดพลาด
+    ''' </summary>
+    Private Sub PlayErrorSound()
+        Try
+            System.Media.SystemSounds.Hand.Play()
+        Catch
+            System.Media.SystemSounds.Beep.Play()
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' อัปเดตเวลาการสแกนล่าสุด
+    ''' </summary>
+    Private Sub UpdateLastScanTime()
+        Try
+            Dim lblScanTime = CType(Me.Controls.Find("lblScanTime", True).FirstOrDefault(), Label)
+            If lblScanTime IsNot Nothing Then
+                lblScanTime.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            End If
+        Catch
+            ' ไม่ต้องทำอะไร
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' บันทึก log การสแกน
+    ''' </summary>
+    Private Sub WriteBarcodeLog(extractedData As BarcodeExtractedData, validation As BarcodeValidationResult)
+        Try
+            Dim logMessage As String = $"Scanned: {extractedData.OriginalData} | " &
+                                  $"Extracted: {extractedData.ExtractedValue} | " &
+                                  $"Valid: {validation.IsValid} | " &
+                                  $"Warnings: {If(validation.ValidationMessages?.Count, 0)}"
+
+            WriteLog(logMessage)
+
+        Catch ex As Exception
+            WriteLog($"Error in WriteBarcodeLog: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' ทดสอบการสแกนด้วยข้อมูลตัวอย่าง
+    ''' </summary>
+    Private Sub TestScanWithValidation(sender As Object, e As EventArgs)
+        Try
+            ' ข้อมูลทดสอบหลายแบบ
+            Dim testData() As String = {
+            "R00C-191604255012766+Q000060+P20414-007700A000+D20250527+LPT0000000+V00C-191604+U0000000", ' ข้อมูลสมบูรณ์
+            "R00C-191604255012766+Q000060+P20414-007700A000+D20250527", ' ข้อมูลบางส่วน
+            "P20414-007700A000+D20250527", ' ข้อมูลน้อย
+            "InvalidBarcodeData123" ' ข้อมูลไม่ถูกต้อง
+        }
+
+            For Each data As String In testData
+                ProcessBarcode(data)
+                System.Threading.Thread.Sleep(1000) ' หน่วงเวลาเพื่อดูผล
+            Next
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการทดสอบ: {ex.Message}",
+                      "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
     End Sub
 End Class
