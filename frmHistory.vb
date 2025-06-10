@@ -9,11 +9,16 @@
 #Region "Form Events"
     Private Sub frmHistory_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         Try
+            Console.WriteLine("frmHistory_Load started")
+
             InitializeForm()
             SetupDataGridView()
             LoadScanHistory()
-            'LoadScanHistory()
+
+            Console.WriteLine("frmHistory_Load completed")
+
         Catch ex As Exception
+            Console.WriteLine($"Error in frmHistory_Load: {ex.Message}")
             MessageBox.Show($"เกิดข้อผิดพลาดในการโหลดฟอร์ม: {ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
@@ -21,7 +26,8 @@
 
     Private Sub frmHistory_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
         Try
-            RefreshData()
+            ' ไม่ต้องเรียก RefreshData() ซ้ำที่นี่เพราะเรียกใน Load แล้ว
+            Console.WriteLine("frmHistory_Shown completed")
         Catch ex As Exception
             Console.WriteLine($"Error in frmHistory_Shown: {ex.Message}")
         End Try
@@ -35,10 +41,12 @@
 #Region "Initialization"
     Private Sub InitializeForm()
         Try
+            Console.WriteLine("InitializeForm started")
+
             ' ตั้งค่าเริ่มต้นสำหรับ ComboBox
-            If cmbStatus.Items.Count > 0 Then
-                cmbStatus.SelectedIndex = 0
-            End If
+            cmbStatus.Items.Clear()
+            cmbStatus.Items.AddRange(New String() {"ทั้งหมด", "ถูกต้อง", "ไม่ถูกต้อง"})
+            cmbStatus.SelectedIndex = 0
 
             ' ตั้งค่าวันที่เริ่มต้น
             dtpFromDate.Value = DateTime.Now.AddDays(-7)
@@ -48,7 +56,10 @@
             btnViewDetail.Enabled = False
             btnDelete.Enabled = False
 
+            Console.WriteLine("InitializeForm completed")
+
         Catch ex As Exception
+            Console.WriteLine($"Error in InitializeForm: {ex.Message}")
             MessageBox.Show($"เกิดข้อผิดพลาดในการเริ่มต้น: {ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
@@ -56,8 +67,11 @@
 
     Private Sub SetupDataGridView()
         Try
+            Console.WriteLine("SetupDataGridView started")
+
             ' เคลียร์คอลัมน์เดิม
             dgvHistory.Columns.Clear()
+            dgvHistory.DataSource = Nothing
 
             ' ตั้งค่าพื้นฐานของ DataGridView
             dgvHistory.AutoGenerateColumns = False
@@ -66,82 +80,78 @@
             dgvHistory.ReadOnly = True
             dgvHistory.SelectionMode = DataGridViewSelectionMode.FullRowSelect
             dgvHistory.MultiSelect = False
+            dgvHistory.RowHeadersVisible = False
 
             ' สร้างคอลัมน์วันที่/เวลา
             Dim colDateTime As New DataGridViewTextBoxColumn() With {
                 .Name = "ScanDateTime",
                 .HeaderText = "วันที่/เวลา",
                 .DataPropertyName = "ScanDateTime",
-                .Width = 150,
-                .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "dd/MM/yyyy HH:mm:ss"}
+                .Width = 150
             }
+            colDateTime.DefaultCellStyle.Format = "dd/MM/yyyy HH:mm:ss"
             dgvHistory.Columns.Add(colDateTime)
 
             ' สร้างคอลัมน์รหัสผลิตภัณฑ์
-            Dim colProductCode As New DataGridViewTextBoxColumn() With {
+            dgvHistory.Columns.Add(New DataGridViewTextBoxColumn() With {
                 .Name = "ProductCode",
                 .HeaderText = "รหัสผลิตภัณฑ์",
                 .DataPropertyName = "ProductCode",
                 .Width = 180
-            }
-            dgvHistory.Columns.Add(colProductCode)
+            })
 
             ' สร้างคอลัมน์รหัสอ้างอิง
-            Dim colReferenceCode As New DataGridViewTextBoxColumn() With {
+            dgvHistory.Columns.Add(New DataGridViewTextBoxColumn() With {
                 .Name = "ReferenceCode",
                 .HeaderText = "รหัสอ้างอิง",
                 .DataPropertyName = "ReferenceCode",
                 .Width = 150
-            }
-            dgvHistory.Columns.Add(colReferenceCode)
+            })
 
             ' สร้างคอลัมน์จำนวน
-            Dim colQuantity As New DataGridViewTextBoxColumn() With {
+            dgvHistory.Columns.Add(New DataGridViewTextBoxColumn() With {
                 .Name = "Quantity",
                 .HeaderText = "จำนวน",
                 .DataPropertyName = "Quantity",
                 .Width = 80
-            }
-            dgvHistory.Columns.Add(colQuantity)
+            })
 
             ' สร้างคอลัมน์วันที่ผลิต
-            Dim colDateCode As New DataGridViewTextBoxColumn() With {
+            dgvHistory.Columns.Add(New DataGridViewTextBoxColumn() With {
                 .Name = "DateCode",
                 .HeaderText = "วันที่ผลิต",
                 .DataPropertyName = "DateCode",
                 .Width = 100
-            }
-            dgvHistory.Columns.Add(colDateCode)
+            })
 
             ' สร้างคอลัมน์สถานะ
-            Dim colStatus As New DataGridViewTextBoxColumn() With {
-                .Name = "Status",
+            dgvHistory.Columns.Add(New DataGridViewTextBoxColumn() With {
+                .Name = "IsValid",
                 .HeaderText = "สถานะ",
+                .DataPropertyName = "IsValid",
                 .Width = 100
-            }
-            dgvHistory.Columns.Add(colStatus)
+            })
 
             ' สร้างคอลัมน์เครื่อง
-            Dim colComputerName As New DataGridViewTextBoxColumn() With {
+            dgvHistory.Columns.Add(New DataGridViewTextBoxColumn() With {
                 .Name = "ComputerName",
                 .HeaderText = "เครื่อง",
                 .DataPropertyName = "ComputerName",
                 .Width = 100
-            }
-            dgvHistory.Columns.Add(colComputerName)
+            })
 
             ' สร้างคอลัมน์ผู้ใช้
-            Dim colUserName As New DataGridViewTextBoxColumn() With {
+            dgvHistory.Columns.Add(New DataGridViewTextBoxColumn() With {
                 .Name = "UserName",
                 .HeaderText = "ผู้ใช้",
                 .DataPropertyName = "UserName",
                 .Width = 100
-            }
-            dgvHistory.Columns.Add(colUserName)
+            })
 
-            Console.WriteLine($"DataGridView setup completed with {dgvHistory.Columns.Count} columns")
+            Console.WriteLine($"SetupDataGridView completed with {dgvHistory.Columns.Count} columns")
 
         Catch ex As Exception
+            Console.WriteLine($"Error in SetupDataGridView: {ex.Message}")
             MessageBox.Show($"เกิดข้อผิดพลาดในการตั้งค่า DataGridView: {ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
@@ -151,11 +161,11 @@
 #Region "Data Management"
     Private Sub LoadScanHistory()
         Try
+            Console.WriteLine("LoadScanHistory started")
+
             isLoading = True
             toolStripProgressBar.Visible = True
             toolStripProgressBar.Style = ProgressBarStyle.Marquee
-
-            Console.WriteLine("Loading scan history...")
 
             ' ตรวจสอบการเชื่อมต่อฐานข้อมูล
             If Not DatabaseManager.IsConnected Then
@@ -169,10 +179,11 @@
 
             ' โหลดข้อมูลจากฐานข้อมูล
             scanHistory = DatabaseManager.GetScanHistory(1000)
-            Console.WriteLine($"Loaded {scanHistory.Count} records from database")
+            Console.WriteLine($"Loaded {If(scanHistory?.Count, 0)} records from database")
 
             ' ถ้าไม่มีข้อมูลจากฐานข้อมูล ให้สร้างข้อมูลทดสอบ
-            If scanHistory.Count = 0 Then
+            If scanHistory Is Nothing OrElse scanHistory.Count = 0 Then
+                Console.WriteLine("No data from database, creating test data...")
                 CreateTestData()
             Else
                 filteredHistory = New List(Of ScanDataRecord)(scanHistory)
@@ -181,7 +192,7 @@
             End If
 
         Catch ex As Exception
-            Console.WriteLine($"Error loading data: {ex.Message}")
+            Console.WriteLine($"Error in LoadScanHistory: {ex.Message}")
             MessageBox.Show($"เกิดข้อผิดพลาดในการโหลดข้อมูล: {ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
             CreateTestData()
@@ -193,7 +204,8 @@
 
     Private Sub CreateTestData()
         Try
-            Console.WriteLine("Creating test data...")
+            Console.WriteLine("CreateTestData started")
+
             scanHistory = New List(Of ScanDataRecord)()
 
             ' สร้างข้อมูลทดสอบ 15 รายการ
@@ -214,35 +226,48 @@
                 scanHistory.Add(testRecord)
             Next
 
+            Console.WriteLine($"Created {scanHistory.Count} test records")
+
+            ' กำหนดข้อมูลที่จะแสดง
             filteredHistory = New List(Of ScanDataRecord)(scanHistory)
+
+            ' รีเฟรช DataGridView
             RefreshDataGridView()
             UpdateRecordCount()
 
-            Console.WriteLine($"Created {scanHistory.Count} test records")
-
         Catch ex As Exception
-            Console.WriteLine($"Error creating test data: {ex.Message}")
+            Console.WriteLine($"Error in CreateTestData: {ex.Message}")
             MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างข้อมูลทดสอบ: {ex.Message}")
         End Try
     End Sub
 
     Private Sub RefreshDataGridView()
         Try
-            If isLoading Then Return
-            If filteredHistory Is Nothing Then
-                Console.WriteLine("filteredHistory is Nothing")
+            If isLoading Then
+                Console.WriteLine("RefreshDataGridView: Still loading, skipping...")
                 Return
             End If
 
-            Console.WriteLine($"Refreshing DataGridView with {filteredHistory.Count} records")
+            If filteredHistory Is Nothing Then
+                Console.WriteLine("RefreshDataGridView: filteredHistory is Nothing")
+                Return
+            End If
 
-            ' ใช้ BindingSource เพื่อป้องกันปัญหา threading
-            Dim bindingSource As New BindingSource()
-            bindingSource.DataSource = filteredHistory
-            dgvHistory.DataSource = bindingSource
+            Console.WriteLine($"RefreshDataGridView: Binding {filteredHistory.Count} records to DataGridView")
+
+            ' ล้าง DataSource เดิม
+            dgvHistory.DataSource = Nothing
+
+            ' ตั้งค่าข้อมูลใหม่
+            If filteredHistory.Count > 0 Then
+                dgvHistory.DataSource = filteredHistory
+                Console.WriteLine($"DataGridView bound successfully. Rows count: {dgvHistory.Rows.Count}")
+            Else
+                Console.WriteLine("No filtered data to display")
+            End If
 
         Catch ex As Exception
-            Console.WriteLine($"Error refreshing DataGridView: {ex.Message}")
+            Console.WriteLine($"Error in RefreshDataGridView: {ex.Message}")
             MessageBox.Show($"เกิดข้อผิดพลาดในการรีเฟรชข้อมูล: {ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
@@ -254,10 +279,14 @@
 
     Private Sub UpdateRecordCount()
         Try
-            lblCount.Text = $"จำนวนรายการ: {If(filteredHistory?.Count, 0)} จาก {If(scanHistory?.Count, 0)} รายการทั้งหมด"
-            Console.WriteLine(lblCount.Text)
+            Dim filteredCount As Integer = If(filteredHistory?.Count, 0)
+            Dim totalCount As Integer = If(scanHistory?.Count, 0)
+
+            lblCount.Text = $"จำนวนรายการ: {filteredCount} จาก {totalCount} รายการทั้งหมด"
+            Console.WriteLine($"UpdateRecordCount: {lblCount.Text}")
+
         Catch ex As Exception
-            Console.WriteLine($"Error updating record count: {ex.Message}")
+            Console.WriteLine($"Error in UpdateRecordCount: {ex.Message}")
         End Try
     End Sub
 #End Region
@@ -265,24 +294,28 @@
 #Region "Event Handlers"
     Private Sub dgvHistory_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs) Handles dgvHistory.DataBindingComplete
         Try
-            Console.WriteLine($"DataBindingComplete fired. Rows: {dgvHistory.Rows.Count}")
+            Console.WriteLine($"DataBindingComplete: Rows={dgvHistory.Rows.Count}, Columns={dgvHistory.Columns.Count}")
 
-            If dgvHistory.Rows.Count = 0 Then
-                Console.WriteLine("No rows in DataGridView after binding")
-            Else
-                Console.WriteLine("DataGridView has data, updating status column...")
+            ' อัปเดตคอลัมน์สถานะ
+            For Each row As DataGridViewRow In dgvHistory.Rows
+                If row.DataBoundItem IsNot Nothing Then
+                    Dim record As ScanDataRecord = CType(row.DataBoundItem, ScanDataRecord)
 
-                ' อัปเดตคอลัมน์สถานะ
-                For Each row As DataGridViewRow In dgvHistory.Rows
-                    If row.DataBoundItem IsNot Nothing Then
-                        Dim record As ScanDataRecord = CType(row.DataBoundItem, ScanDataRecord)
-                        If dgvHistory.Columns.Contains("Status") Then
-                            row.Cells("Status").Value = If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")
-                            row.Cells("Status").Style.ForeColor = If(record.IsValid, Color.Green, Color.Red)
-                        End If
+                    ' อัปเดตคอลัมน์สถานะ
+                    If dgvHistory.Columns.Contains("IsValid") Then
+                        Dim statusText As String = If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")
+                        row.Cells("IsValid").Value = statusText
+                        row.Cells("IsValid").Style.ForeColor = If(record.IsValid, Color.Green, Color.Red)
                     End If
-                Next
-            End If
+
+                    ' เปลี่ยนสีแถวตามสถานะ
+                    If Not record.IsValid Then
+                        row.DefaultCellStyle.BackColor = Color.FromArgb(255, 235, 235)
+                    End If
+                End If
+            Next
+
+            Console.WriteLine("DataBindingComplete: Status column updated")
 
         Catch ex As Exception
             Console.WriteLine($"Error in DataBindingComplete: {ex.Message}")
@@ -296,22 +329,7 @@
             btnDelete.Enabled = hasSelection
 
         Catch ex As Exception
-            Console.WriteLine($"Error in selection changed: {ex.Message}")
-        End Try
-    End Sub
-
-    Private Sub dgvHistory_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs) Handles dgvHistory.CellFormatting
-        Try
-            ' เปลี่ยนสีแถวตามสถานะ
-            If e.RowIndex >= 0 AndAlso dgvHistory.Rows(e.RowIndex).DataBoundItem IsNot Nothing Then
-                Dim record As ScanDataRecord = CType(dgvHistory.Rows(e.RowIndex).DataBoundItem, ScanDataRecord)
-                If Not record.IsValid Then
-                    dgvHistory.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.FromArgb(255, 235, 235)
-                End If
-            End If
-
-        Catch ex As Exception
-            Console.WriteLine($"Error in cell formatting: {ex.Message}")
+            Console.WriteLine($"Error in SelectionChanged: {ex.Message}")
         End Try
     End Sub
 
@@ -382,6 +400,8 @@
         Try
             If isLoading OrElse scanHistory Is Nothing Then Return
 
+            Console.WriteLine("ApplyFilters started")
+
             filteredHistory = New List(Of ScanDataRecord)(scanHistory)
 
             ' กรองตามข้อความค้นหา
@@ -409,10 +429,13 @@
                                                         Return x.ScanDateTime >= fromDate AndAlso x.ScanDateTime <= toDate
                                                     End Function).ToList()
 
+            Console.WriteLine($"ApplyFilters: {filteredHistory.Count} records after filtering")
+
             RefreshDataGridView()
             UpdateRecordCount()
 
         Catch ex As Exception
+            Console.WriteLine($"Error in ApplyFilters: {ex.Message}")
             MessageBox.Show($"เกิดข้อผิดพลาดในการกรองข้อมูล: {ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try

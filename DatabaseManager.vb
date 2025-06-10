@@ -141,12 +141,24 @@ Public Class DatabaseManager
         Dim history As New List(Of ScanDataRecord)()
         
         Try
+            Console.WriteLine($"GetScanHistory called with limit: {limit}")
+            Console.WriteLine($"IsConnected: {_isConnected}")
+            Console.WriteLine($"ConnectionString: {If(String.IsNullOrEmpty(_connectionString), "Empty", "Set")}")
+            
             If Not _isConnected Then
+                Console.WriteLine("Not connected, attempting to initialize...")
                 Initialize()
             End If
 
+            If String.IsNullOrEmpty(_connectionString) Then
+                Console.WriteLine("Connection string is empty, returning empty list")
+                Return history
+            End If
+
             Using conn As New SqlConnection(_connectionString)
+                Console.WriteLine("Opening connection...")
                 conn.Open()
+                Console.WriteLine("Connection opened successfully")
                 
                 Dim sql As String = $"
                     SELECT TOP {limit} 
@@ -156,32 +168,44 @@ Public Class DatabaseManager
                     FROM ScanHistory 
                     ORDER BY ScanDateTime DESC"
                 
+                Console.WriteLine($"Executing SQL: {sql}")
+                
                 Using cmd As New SqlCommand(sql, conn)
                     Using reader As SqlDataReader = cmd.ExecuteReader()
+                        Console.WriteLine("SQL executed, reading data...")
+                        
+                        Dim recordCount As Integer = 0
                         While reader.Read()
+                            recordCount += 1
+                            
                             Dim record As New ScanDataRecord() With {
-                                .ScanDateTime = reader("ScanDateTime"),
-                                .OriginalData = reader("OriginalData").ToString(),
-                                .ExtractedData = reader("ExtractedData").ToString(),
-                                .ProductCode = reader("ProductCode").ToString(),
-                                .ReferenceCode = reader("ReferenceCode").ToString(),
-                                .Quantity = reader("Quantity").ToString(),
-                                .DateCode = reader("DateCode").ToString(),
-                                .IsValid = CBool(reader("IsValid")),
-                                .ValidationMessages = reader("ValidationMessages").ToString(),
-                                .ComputerName = reader("ComputerName").ToString(),
-                                .UserName = reader("UserName").ToString()
+                                .ScanDateTime = If(IsDBNull(reader("ScanDateTime")), DateTime.MinValue, CDate(reader("ScanDateTime"))),
+                                .OriginalData = If(IsDBNull(reader("OriginalData")), "", reader("OriginalData").ToString()),
+                                .ExtractedData = If(IsDBNull(reader("ExtractedData")), "", reader("ExtractedData").ToString()),
+                                .ProductCode = If(IsDBNull(reader("ProductCode")), "", reader("ProductCode").ToString()),
+                                .ReferenceCode = If(IsDBNull(reader("ReferenceCode")), "", reader("ReferenceCode").ToString()),
+                                .Quantity = If(IsDBNull(reader("Quantity")), "", reader("Quantity").ToString()),
+                                .DateCode = If(IsDBNull(reader("DateCode")), "", reader("DateCode").ToString()),
+                                .IsValid = If(IsDBNull(reader("IsValid")), False, CBool(reader("IsValid"))),
+                                .ValidationMessages = If(IsDBNull(reader("ValidationMessages")), "", reader("ValidationMessages").ToString()),
+                                .ComputerName = If(IsDBNull(reader("ComputerName")), "", reader("ComputerName").ToString()),
+                                .UserName = If(IsDBNull(reader("UserName")), "", reader("UserName").ToString())
                             }
                             history.Add(record)
                         End While
+                        
+                        Console.WriteLine($"Read {recordCount} records from database")
                     End Using
                 End Using
             End Using
             
         Catch ex As Exception
+            Console.WriteLine($"Error in GetScanHistory: {ex.Message}")
+            Console.WriteLine($"Stack trace: {ex.StackTrace}")
             LogError($"Error getting scan history: {ex.Message}")
         End Try
         
+        Console.WriteLine($"Returning {history.Count} records")
         Return history
     End Function
 
