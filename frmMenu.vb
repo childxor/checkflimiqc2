@@ -2,6 +2,9 @@
 Imports System.Windows.Forms
 Imports System.Text.RegularExpressions
 Imports System.IO
+Imports System.Xml
+Imports System.Data.SqlClient
+Imports System.Configuration
 
 Public Class frmMenu
     Private Const WH_KEYBOARD_LL As Integer = 13
@@ -46,108 +49,81 @@ Public Class frmMenu
     Private Sub frmMenu_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         _hookID = SetHook(_proc)
         LoadSettingsFromConfig()
-        InitializeUI()
         ApplyThemeSettings()
-
-        ' แสดงสถานะเริ่มต้น
+        InitializeDatabase()
         UpdateStatusBar("พร้อมรับการสแกน QR Code")
     End Sub
 
-    Private Sub InitializeUI()
+    ' Private Sub InitializeUI()
+    '     Try
+    '         ' ใช้ controls ที่มีอยู่แล้วจาก Designer
+    '         LoadSettingsFromConfig()
+    '         ApplyThemeSettings()
+    '     Catch ex As Exception
+    '         MessageBox.Show($"เกิดข้อผิดพลาดในการเริ่มต้นหน้าจอ: {ex.Message}",
+    '                       "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+    '     End Try
+    ' End Sub
+
+    ' Private Sub CreateButtons()
+    '     Try
+    '         ' ปุ่มการตั้งค่า
+    '         If Me.Controls.Find("btnSettings", True).Length = 0 Then
+    '             Dim btnSettings As New Button()
+    '             btnSettings.Name = "btnSettings"
+    '             btnSettings.Text = "การตั้งค่า"
+    '             btnSettings.Location = New Point(450, 50)
+    '             btnSettings.Size = New Size(100, 30)
+    '             AddHandler btnSettings.Click, AddressOf OpenSettings
+    '             Me.Controls.Add(btnSettings)
+    '         End If
+
+    '         ' ปุ่มทดสอบ
+    '         If Me.Controls.Find("btnTest", True).Length = 0 Then
+    '             Dim btnTest As New Button()
+    '             btnTest.Name = "btnTest"
+    '             btnTest.Text = "ทดสอบ"
+    '             btnTest.Location = New Point(560, 50)
+    '             btnTest.Size = New Size(100, 30)
+    '             AddHandler btnTest.Click, AddressOf TestScan
+    '             Me.Controls.Add(btnTest)
+    '         End If
+
+    '         ' ปุ่มล้างข้อมูล
+    '         If Me.Controls.Find("btnClear", True).Length = 0 Then
+    '             Dim btnClear As New Button()
+    '             btnClear.Name = "btnClear"
+    '             btnClear.Text = "ล้างข้อมูล"
+    '             btnClear.Location = New Point(670, 50)
+    '             btnClear.Size = New Size(100, 30)
+    '             AddHandler btnClear.Click, AddressOf ClearData
+    '             Me.Controls.Add(btnClear)
+    '         End If
+
+    '     Catch ex As Exception
+    '         MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างปุ่ม: {ex.Message}",
+    '                       "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+    '     End Try
+    ' End Sub
+
+    ''' <summary>
+    ''' เปิดหน้าประวัติการสแกน
+    ''' </summary>
+    Private Sub OpenHistoryForm()
         Try
-            ' สร้าง MenuStrip หากยังไม่มี
-            If Me.MainMenuStrip Is Nothing Then
-                Dim menuStrip As New MenuStrip()
-                Me.MainMenuStrip = menuStrip
-                Me.Controls.Add(menuStrip)
-
-                ' สร้างเมนู
-                Dim fileMenu As New ToolStripMenuItem("ไฟล์")
-                Dim settingsMenu As New ToolStripMenuItem("การตั้งค่า", Nothing, AddressOf OpenSettings)
-                Dim exitMenu As New ToolStripMenuItem("ออก", Nothing, AddressOf ExitApplication)
-
-                fileMenu.DropDownItems.AddRange({settingsMenu, New ToolStripSeparator(), exitMenu})
-                menuStrip.Items.Add(fileMenu)
-
-                Dim helpMenu As New ToolStripMenuItem("ช่วยเหลือ")
-                Dim aboutMenu As New ToolStripMenuItem("เกี่ยวกับ", Nothing, AddressOf ShowAbout)
-                helpMenu.DropDownItems.Add(aboutMenu)
-                menuStrip.Items.Add(helpMenu)
+            If Not DatabaseManager.IsConnected Then
+                MessageBox.Show("ไม่สามารถเชื่อมต่อฐานข้อมูลได้" & vbNewLine &
+                              "กรุณาตรวจสอบการตั้งค่าฐานข้อมูล",
+                              "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return
             End If
 
-            ' สร้าง StatusStrip หากยังไม่มี
-            If Me.Controls.OfType(Of StatusStrip)().Count = 0 Then
-                Dim statusStrip As New StatusStrip()
-                Dim statusLabel As New ToolStripStatusLabel("พร้อมใช้งาน")
-                statusLabel.Name = "statusLabel"
-                statusStrip.Items.Add(statusLabel)
-                Me.Controls.Add(statusStrip)
-            End If
-
-            ' สร้าง TextBox สำหรับแสดงบาร์โค้ด หากยังไม่มี
-            If Me.Controls.Find("txtBarcode", True).Length = 0 Then
-                Dim txtBarcode As New TextBox()
-                txtBarcode.Name = "txtBarcode"
-                txtBarcode.Location = New Point(20, 50)
-                txtBarcode.Size = New Size(400, 30)
-                txtBarcode.Font = New Font("Segoe UI", 12)
-                txtBarcode.ReadOnly = True
-
-                Dim lblBarcode As New Label()
-                lblBarcode.Text = "ข้อมูลที่สแกนได้:"
-                lblBarcode.Location = New Point(20, 25)
-                lblBarcode.Size = New Size(200, 20)
-
-                Me.Controls.Add(lblBarcode)
-                Me.Controls.Add(txtBarcode)
-            End If
-
-            ' สร้างปุ่มต่างๆ
-            CreateButtons()
+            Dim historyForm As New frmHistory()
+            historyForm.ShowDialog()
+            historyForm.Dispose()
 
         Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างหน้าจอ: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub CreateButtons()
-        Try
-            ' ปุ่มการตั้งค่า
-            If Me.Controls.Find("btnSettings", True).Length = 0 Then
-                Dim btnSettings As New Button()
-                btnSettings.Name = "btnSettings"
-                btnSettings.Text = "การตั้งค่า"
-                btnSettings.Location = New Point(450, 50)
-                btnSettings.Size = New Size(100, 30)
-                AddHandler btnSettings.Click, AddressOf OpenSettings
-                Me.Controls.Add(btnSettings)
-            End If
-
-            ' ปุ่มทดสอบ
-            If Me.Controls.Find("btnTest", True).Length = 0 Then
-                Dim btnTest As New Button()
-                btnTest.Name = "btnTest"
-                btnTest.Text = "ทดสอบ"
-                btnTest.Location = New Point(560, 50)
-                btnTest.Size = New Size(100, 30)
-                AddHandler btnTest.Click, AddressOf TestScan
-                Me.Controls.Add(btnTest)
-            End If
-
-            ' ปุ่มล้างข้อมูล
-            If Me.Controls.Find("btnClear", True).Length = 0 Then
-                Dim btnClear As New Button()
-                btnClear.Name = "btnClear"
-                btnClear.Text = "ล้างข้อมูล"
-                btnClear.Location = New Point(670, 50)
-                btnClear.Size = New Size(100, 30)
-                AddHandler btnClear.Click, AddressOf ClearData
-                Me.Controls.Add(btnClear)
-            End If
-
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างปุ่ม: {ex.Message}",
+            MessageBox.Show($"เกิดข้อผิดพลาดในการเปิดหน้าประวัติ: {ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
@@ -155,32 +131,55 @@ Public Class frmMenu
     Private Sub LoadSettingsFromConfig()
         Try
             If File.Exists("Settings.config") Then
-                ' โหลดการตั้งค่าจากไฟล์
-                Dim tempSettings As New frmSettings()
-                scanTimeout = CInt(tempSettings.GetSetting("scantimeout"))
-                showFullData = CBool(tempSettings.GetSetting("showfulldata"))
-                autoExtract = CBool(tempSettings.GetSetting("autoextract"))
-                soundEnabled = CBool(tempSettings.GetSetting("soundenabled"))
-                extractPattern = CStr(tempSettings.GetSetting("extractpattern"))
-                tempSettings.Dispose()
+                Dim doc As New XmlDocument()
+                doc.Load("Settings.config")
+
+                scanTimeout = GetSettingValueFromXML(doc, "ScanTimeout", 100)
+                showFullData = GetSettingValueFromXML(doc, "ShowFullData", False)
+                autoExtract = GetSettingValueFromXML(doc, "AutoExtract", True)
+                soundEnabled = GetSettingValueFromXML(doc, "SoundEnabled", True)
+                extractPattern = GetSettingValueFromXML(doc, "ExtractPattern", "\+P([^+]+)\+D")
             End If
         Catch ex As Exception
-            ' ใช้ค่าเริ่มต้นหากโหลดไม่สำเร็จ
-            scanTimeout = 100
-            showFullData = False
-            autoExtract = True
-            soundEnabled = True
-            extractPattern = "\+P([^+]+)\+D"
+            ResetToDefaultSettings()
         End Try
     End Sub
+
+    Private Sub ResetToDefaultSettings()
+        scanTimeout = 100
+        showFullData = False
+        autoExtract = True
+        soundEnabled = True
+        extractPattern = "\+P([^+]+)\+D"
+    End Sub
+
+    Private Function GetSettingValueFromXML(doc As XmlDocument, key As String, defaultValue As Object) As Object
+        Try
+            Dim node As XmlNode = doc.SelectSingleNode($"//Setting[@key='{key}']")
+            If node IsNot Nothing Then
+                Dim value As String = node.Attributes("value").Value
+                Select Case defaultValue.GetType()
+                    Case GetType(Boolean)
+                        Return Boolean.Parse(value)
+                    Case GetType(Integer)
+                        Return Integer.Parse(value)
+                    Case Else
+                        Return value
+                End Select
+            End If
+        Catch
+        End Try
+        Return defaultValue
+    End Function
 
     Private Sub ApplyThemeSettings()
         Try
             If File.Exists("Settings.config") Then
-                Dim tempSettings As New frmSettings()
-                Dim theme As String = CStr(tempSettings.GetSetting("theme"))
-                Dim showStatusBar As Boolean = CBool(tempSettings.GetSetting("showstatusbar"))
-                Dim showToolbar As Boolean = CBool(tempSettings.GetSetting("showtoolbar"))
+                Dim doc As New XmlDocument()
+                doc.Load("Settings.config")
+
+                Dim theme As String = GetSettingValueFromXML(doc, "Theme", "Light")
+                Dim showStatusBar As Boolean = GetSettingValueFromXML(doc, "ShowStatusBar", True)
 
                 ' ปรับธีม
                 Select Case theme.ToLower()
@@ -190,20 +189,10 @@ Public Class frmMenu
                         ApplyLightTheme()
                 End Select
 
-                ' แสดง/ซ่อน UI elements
-                If Me.MainMenuStrip IsNot Nothing Then
-                    Me.MainMenuStrip.Visible = showToolbar
-                End If
-
-                Dim statusStrip = Me.Controls.OfType(Of StatusStrip)().FirstOrDefault()
-                If statusStrip IsNot Nothing Then
-                    statusStrip.Visible = showStatusBar
-                End If
-
-                tempSettings.Dispose()
+                ' แสดง/ซ่อน status bar
+                statusStrip.Visible = showStatusBar
             End If
         Catch
-            ' ใช้ธีม default หากมีปัญหา
             ApplyLightTheme()
         End Try
     End Sub
@@ -211,31 +200,15 @@ Public Class frmMenu
     Private Sub ApplyDarkTheme()
         Me.BackColor = Color.FromArgb(45, 45, 48)
         Me.ForeColor = Color.White
-
-        For Each ctrl As Control In Me.Controls
-            If TypeOf ctrl Is TextBox Then
-                ctrl.BackColor = Color.FromArgb(37, 37, 38)
-                ctrl.ForeColor = Color.White
-            ElseIf TypeOf ctrl Is Button Then
-                ctrl.BackColor = Color.FromArgb(62, 62, 64)
-                ctrl.ForeColor = Color.White
-            End If
-        Next
+        pnlMain.BackColor = Color.FromArgb(37, 37, 38)
+        pnlHeader.BackColor = Color.FromArgb(41, 128, 185)
     End Sub
 
     Private Sub ApplyLightTheme()
         Me.BackColor = SystemColors.Control
         Me.ForeColor = SystemColors.ControlText
-
-        For Each ctrl As Control In Me.Controls
-            If TypeOf ctrl Is TextBox Then
-                ctrl.BackColor = SystemColors.Window
-                ctrl.ForeColor = SystemColors.WindowText
-            ElseIf TypeOf ctrl Is Button Then
-                ctrl.BackColor = SystemColors.Control
-                ctrl.ForeColor = SystemColors.ControlText
-            End If
-        Next
+        pnlMain.BackColor = Color.FromArgb(248, 249, 250)
+        pnlHeader.BackColor = Color.FromArgb(41, 128, 185)
     End Sub
 
     Private Function SetHook(proc As LowLevelKeyboardProc) As IntPtr
@@ -314,24 +287,20 @@ Public Class frmMenu
 
     Private Sub UpdateStatusBar(message As String)
         Try
-            Dim statusStrip = Me.Controls.OfType(Of StatusStrip)().FirstOrDefault()
-            If statusStrip IsNot Nothing Then
-                Dim statusLabel = CType(statusStrip.Items.Find("statusLabel", False).FirstOrDefault(), ToolStripStatusLabel)
-                If statusLabel IsNot Nothing Then
-                    statusLabel.Text = $"{DateTime.Now:HH:mm:ss} - {message}"
-                End If
-            End If
+            toolStripStatusLabel.Text = $"{DateTime.Now:HH:mm:ss} - {message}"
         Catch
-            ' ไม่ต้องทำอะไรถ้าอัปเดต status bar ไม่ได้
+            ' ไม่ต้องทำอะไร
         End Try
     End Sub
 
     Private Sub WriteLog(message As String)
         Try
             If File.Exists("Settings.config") Then
-                Dim tempSettings As New frmSettings()
-                Dim enableLogging As Boolean = CBool(tempSettings.GetSetting("enablelogging"))
-                Dim logPath As String = CStr(tempSettings.GetSetting("logpath"))
+                Dim doc As New XmlDocument()
+                doc.Load("Settings.config")
+
+                Dim enableLogging As Boolean = GetSettingValueFromXML(doc, "EnableLogging", True)
+                Dim logPath As String = GetSettingValueFromXML(doc, "LogPath", Path.Combine(Application.StartupPath, "Logs"))
 
                 If enableLogging AndAlso Not String.IsNullOrEmpty(logPath) Then
                     If Not Directory.Exists(logPath) Then
@@ -343,20 +312,17 @@ Public Class frmMenu
 
                     File.AppendAllText(logFile, logEntry)
                 End If
-
-                tempSettings.Dispose()
             End If
         Catch
-            ' ไม่ต้องทำอะไรถ้าเขียน log ไม่ได้
+            ' ไม่ต้องทำอะไร
         End Try
     End Sub
 
-    ' Event Handlers สำหรับเมนูและปุ่ม
-    Private Sub OpenSettings(sender As Object, e As EventArgs)
+    ' Event Handlers สำหรับปุ่มต่างๆ
+    Private Sub btnSettings_Click(sender As Object, e As EventArgs) Handles btnSettings.Click
         Try
             Dim settingsForm As New frmSettings()
             If settingsForm.ShowDialog() = DialogResult.OK Then
-                ' โหลดการตั้งค่าใหม่
                 LoadSettingsFromConfig()
                 ApplyThemeSettings()
                 UpdateStatusBar("อัปเดตการตั้งค่าเรียบร้อยแล้ว")
@@ -368,39 +334,25 @@ Public Class frmMenu
         End Try
     End Sub
 
-    Private Sub ExitApplication(sender As Object, e As EventArgs)
-        Application.Exit()
-    End Sub
-
-    Private Sub ShowAbout(sender As Object, e As EventArgs)
-        MessageBox.Show("QR Code Scanner v1.0" & vbNewLine &
-                       "ระบบสแกน QR Code พร้อมการดึงข้อมูลอัตโนมัติ" & vbNewLine & vbNewLine &
-                       "พัฒนาโดย: คุณ" & vbNewLine &
-                       "วันที่: " & DateTime.Now.ToString("yyyy-MM-dd"),
-                       "เกี่ยวกับโปรแกรม", MessageBoxButtons.OK, MessageBoxIcon.Information)
-    End Sub
-
-    Private Sub TestScan(sender As Object, e As EventArgs)
+    Private Sub btnClear_Click(sender As Object, e As EventArgs) Handles btnClear.Click
         Try
-            Dim testData As String = "R00C-191604255012766+Q000060+P20414-007700A000+D20250527+LPT0000000+V00C-191604+U0000000"
-            ProcessBarcode(testData)
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการทดสอบ: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub ClearData(sender As Object, e As EventArgs)
-        Try
-            Dim txtBarcode = CType(Me.Controls.Find("txtBarcode", True).FirstOrDefault(), TextBox)
-            If txtBarcode IsNot Nothing Then
-                txtBarcode.Clear()
-            End If
+            txtBarcode.Clear()
+            lblBarcodeValue.Text = "No barcode scanned"
+            lblBarcodeValue.ForeColor = Color.FromArgb(46, 125, 50)
+            lblScanTime.Text = "Never scanned"
+            txtBarcode.BackColor = SystemColors.Window
+            picStatusIcon.BackColor = Color.FromArgb(255, 159, 67)
+            lblStatusValue.Text = "Ready to scan..."
+            lblStatusValue.ForeColor = Color.FromArgb(255, 159, 67)
             UpdateStatusBar("ล้างข้อมูลแล้ว")
         Catch ex As Exception
             MessageBox.Show($"เกิดข้อผิดพลาดในการล้างข้อมูล: {ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
+    End Sub
+
+    Private Sub btnExit_Click(sender As Object, e As EventArgs) Handles btnExit.Click
+        Application.Exit()
     End Sub
 
     Private Sub frmMenu_FormClosing(sender As Object, e As FormClosingEventArgs) Handles MyBase.FormClosing
@@ -417,30 +369,18 @@ Public Class frmMenu
         ApplyThemeSettings()
     End Sub
 
-    Private Sub btnSettings_Click(sender As Object, e As EventArgs) Handles btnSettings.Click
-        OpenSettings(sender, e)
-    End Sub
 
-    Private Sub btnClear_Click(sender As Object, e As EventArgs) Handles btnClear.Click
-        ClearData(sender, e)
-    End Sub
-
-    Private Sub btnExit_Click(sender As Object, e As EventArgs) Handles btnExit.Click
-        ExitApplication(sender, e)
-    End Sub
 
     ''' <summary>
-    ''' ประมวลผล barcode ที่สแกนได้ พร้อมการตรวจสอบความถูกต้อง
+    ''' ประมวลผล barcode ที่สแกนได้ พร้อมการตรวจสอบและบันทึกฐานข้อมูล
     ''' </summary>
     Public Sub ProcessBarcode(barcode As String)
         Try
-            ' ตรวจสอบความถูกต้องของ barcode ก่อน
+            ' ตรวจสอบความถูกต้องของ barcode
             Dim validation As BarcodeValidationResult = BarcodeValidator.ValidateBarcode(barcode)
 
-            ' เลือกโหมดการดึงข้อมูลตามการตั้งค่า
-            Dim extractionMode As ExtractionMode = GetExtractionMode()
-
             ' ดึงข้อมูลจาก barcode
+            Dim extractionMode As ExtractionMode = GetExtractionMode()
             Dim extractedData As BarcodeExtractedData = BarcodeValidator.ExtractBarcodeData(barcode, extractionMode)
 
             ' แสดงผลในหน้าจอ
@@ -449,17 +389,14 @@ Public Class frmMenu
 
                           ' เล่นเสียงตามผลการตรวจสอบ
                           If soundEnabled Then
-                              If validation.IsValid Then
-                                  PlaySuccessSound()
-                              ElseIf validation.IsPartiallyValid Then
-                                  PlayWarningSound()
-                              Else
-                                  PlayErrorSound()
-                              End If
+                              PlaySoundByResult(validation)
                           End If
 
                           ' แสดงข้อความแจ้งเตือนตามการตั้งค่า
                           ShowBarcodeMessage(extractedData, validation)
+
+                          ' บันทึกลงฐานข้อมูล
+                          SaveToDatabase(extractedData, validation)
 
                           ' บันทึก log
                           WriteBarcodeLog(extractedData, validation)
@@ -474,27 +411,67 @@ Public Class frmMenu
     End Sub
 
     ''' <summary>
+    ''' บันทึกข้อมูลลงฐานข้อมูล
+    ''' </summary>
+    Private Sub SaveToDatabase(extractedData As BarcodeExtractedData, validation As BarcodeValidationResult)
+        Try
+            If DatabaseManager.IsConnected Then
+                Dim scanRecord As New ScanDataRecord() With {
+                    .ScanDateTime = DateTime.Now,
+                    .OriginalData = extractedData.OriginalData,
+                    .ExtractedData = extractedData.ExtractedValue,
+                    .ProductCode = extractedData.ProductCode,
+                    .ReferenceCode = extractedData.ReferenceCode,
+                    .Quantity = extractedData.Quantity,
+                    .DateCode = extractedData.DateCode,
+                    .IsValid = validation.IsValid,
+                    .ValidationMessages = If(validation.ValidationMessages IsNot Nothing,
+                                           String.Join("; ", validation.ValidationMessages), ""),
+                    .ComputerName = Environment.MachineName,
+                    .UserName = Environment.UserName
+                }
+
+                If Not DatabaseManager.SaveScanData(scanRecord) Then
+                    WriteLog("Failed to save scan data to database")
+                End If
+            End If
+        Catch ex As Exception
+            WriteLog($"Error saving to database: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
     ''' แสดงผลลัพธ์การสแกนในหน้าจอ
     ''' </summary>
     Private Sub DisplayBarcodeResult(extractedData As BarcodeExtractedData, validation As BarcodeValidationResult)
         Try
             ' อัปเดตข้อความในกล่องข้อความ
-            Dim txtBarcode = CType(Me.Controls.Find("txtBarcode", True).FirstOrDefault(), TextBox)
-            If txtBarcode IsNot Nothing Then
-                txtBarcode.Text = extractedData.ExtractedValue
+            txtBarcode.Text = extractedData.ExtractedValue
+            lblBarcodeValue.Text = extractedData.ProductCode
 
-                ' เปลี่ยนสีตามสถานะ
-                If validation.IsValid Then
-                    txtBarcode.BackColor = Color.LightGreen
-                    txtBarcode.ForeColor = Color.Black
-                ElseIf validation.IsPartiallyValid Then
-                    txtBarcode.BackColor = Color.LightYellow
-                    txtBarcode.ForeColor = Color.Black
-                Else
-                    txtBarcode.BackColor = Color.LightPink
-                    txtBarcode.ForeColor = Color.Black
-                End If
+            ' เปลี่ยนสีตามสถานะ
+            If validation.IsValid Then
+                txtBarcode.BackColor = Color.LightGreen
+                lblBarcodeValue.ForeColor = Color.FromArgb(46, 125, 50)
+                picStatusIcon.BackColor = Color.FromArgb(46, 125, 50)
+                lblStatusValue.Text = "สแกนสำเร็จ"
+                lblStatusValue.ForeColor = Color.FromArgb(46, 125, 50)
+            ElseIf validation.IsPartiallyValid Then
+                txtBarcode.BackColor = Color.LightYellow
+                lblBarcodeValue.ForeColor = Color.FromArgb(255, 159, 67)
+                picStatusIcon.BackColor = Color.FromArgb(255, 159, 67)
+                lblStatusValue.Text = "สแกนสำเร็จ (มีคำเตือน)"
+                lblStatusValue.ForeColor = Color.FromArgb(255, 159, 67)
+            Else
+                txtBarcode.BackColor = Color.LightPink
+                lblBarcodeValue.ForeColor = Color.FromArgb(231, 76, 60)
+                picStatusIcon.BackColor = Color.FromArgb(231, 76, 60)
+                lblStatusValue.Text = "สแกนไม่สมบูรณ์"
+                lblStatusValue.ForeColor = Color.FromArgb(231, 76, 60)
             End If
+
+            ' อัปเดตเวลาการสแกนล่าสุด
+            lblScanTime.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
 
             ' อัปเดต status bar
             Dim statusMessage As String = ""
@@ -507,9 +484,6 @@ Public Class frmMenu
             End If
 
             UpdateStatusBar(statusMessage)
-
-            ' อัปเดตเวลาการสแกนล่าสุด
-            UpdateLastScanTime()
 
         Catch ex As Exception
             WriteLog($"Error in DisplayBarcodeResult: {ex.Message}")
@@ -610,48 +584,20 @@ Public Class frmMenu
     ''' <summary>
     ''' เล่นเสียงสำเร็จ
     ''' </summary>
-    Private Sub PlaySuccessSound()
-        Try
-            System.Media.SystemSounds.Asterisk.Play()
-        Catch
-            ' fallback เป็นเสียงปกติ
-            System.Media.SystemSounds.Beep.Play()
-        End Try
-    End Sub
-
     ''' <summary>
-    ''' เล่นเสียงเตือน
+    ''' เล่นเสียงตามผลการตรวจสอบ
     ''' </summary>
-    Private Sub PlayWarningSound()
+    Private Sub PlaySoundByResult(validation As BarcodeValidationResult)
         Try
-            System.Media.SystemSounds.Exclamation.Play()
-        Catch
-            System.Media.SystemSounds.Beep.Play()
-        End Try
-    End Sub
-
-    ''' <summary>
-    ''' เล่นเสียงผิดพลาด
-    ''' </summary>
-    Private Sub PlayErrorSound()
-        Try
-            System.Media.SystemSounds.Hand.Play()
-        Catch
-            System.Media.SystemSounds.Beep.Play()
-        End Try
-    End Sub
-
-    ''' <summary>
-    ''' อัปเดตเวลาการสแกนล่าสุด
-    ''' </summary>
-    Private Sub UpdateLastScanTime()
-        Try
-            Dim lblScanTime = CType(Me.Controls.Find("lblScanTime", True).FirstOrDefault(), Label)
-            If lblScanTime IsNot Nothing Then
-                lblScanTime.Text = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss")
+            If validation.IsValid Then
+                System.Media.SystemSounds.Asterisk.Play()
+            ElseIf validation.IsPartiallyValid Then
+                System.Media.SystemSounds.Exclamation.Play()
+            Else
+                System.Media.SystemSounds.Hand.Play()
             End If
         Catch
-            ' ไม่ต้องทำอะไร
+            System.Media.SystemSounds.Beep.Play()
         End Try
     End Sub
 
@@ -675,15 +621,18 @@ Public Class frmMenu
     ''' <summary>
     ''' ทดสอบการสแกนด้วยข้อมูลตัวอย่าง
     ''' </summary>
-    Private Sub TestScanWithValidation(sender As Object, e As EventArgs)
+    ''' <summary>
+    ''' ทดสอบการสแกนด้วยข้อมูลตัวอย่าง
+    ''' </summary>
+    Private Sub TestScanWithValidation()
         Try
             ' ข้อมูลทดสอบหลายแบบ
             Dim testData() As String = {
-            "R00C-191604255012766+Q000060+P20414-007700A000+D20250527+LPT0000000+V00C-191604+U0000000", ' ข้อมูลสมบูรณ์
-            "R00C-191604255012766+Q000060+P20414-007700A000+D20250527", ' ข้อมูลบางส่วน
-            "P20414-007700A000+D20250527", ' ข้อมูลน้อย
-            "InvalidBarcodeData123" ' ข้อมูลไม่ถูกต้อง
-        }
+                "R00C-191604255012766+Q000060+P20414-007700A000+D20250527+LPT0000000+V00C-191604+U0000000", ' ข้อมูลสมบูรณ์
+                "R00C-191604255012766+Q000060+P20414-007700A000+D20250527", ' ข้อมูลบางส่วน
+                "P20414-007700A000+D20250527", ' ข้อมูลน้อย
+                "InvalidBarcodeData123" ' ข้อมูลไม่ถูกต้อง
+            }
 
             For Each data As String In testData
                 ProcessBarcode(data)
@@ -692,7 +641,42 @@ Public Class frmMenu
 
         Catch ex As Exception
             MessageBox.Show($"เกิดข้อผิดพลาดในการทดสอบ: {ex.Message}",
-                      "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
+    End Sub
+
+    ''' <summary>
+    ''' เพิ่มเมนูประวัติการสแกน (เรียกจาก Designer หรือ Load event)
+    ''' </summary>
+    Private Sub AddHistoryMenuItem()
+        Try
+            ' เพิ่มปุ่มประวัติในหน้าหลัก (ถ้าต้องการ)
+            ' หรือเพิ่มในเมนูบาร์
+        Catch
+            ' ไม่ต้องทำอะไร
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' เริ่มต้นการเชื่อมต่อฐานข้อมูล
+    ''' </summary>
+    Private Sub InitializeDatabase()
+        Try
+            ' เริ่มต้นฐานข้อมูล
+            If DatabaseManager.Initialize() Then
+                ' สร้างตารางหากยังไม่มี
+                DatabaseManager.CreateTablesIfNotExists()
+                UpdateStatusBar("เชื่อมต่อฐานข้อมูลสำเร็จ")
+            Else
+                UpdateStatusBar("ไม่สามารถเชื่อมต่อฐานข้อมูลได้ - ระบบจะทำงานแบบ Offline")
+            End If
+        Catch ex As Exception
+            WriteLog($"Database initialization error: {ex.Message}")
+            UpdateStatusBar("ระบบทำงานแบบ Offline")
+        End Try
+    End Sub
+
+    Private Sub btnHistory_Click(sender As Object, e As EventArgs) Handles btnHistory.Click
+        OpenHistoryForm()
     End Sub
 End Class

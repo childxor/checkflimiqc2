@@ -42,6 +42,7 @@ Partial Class frmMenu
         btnClear = New Button()
         btnSettings = New Button()
         btnExit = New Button()
+        btnHistory = New Button()
         statusStrip = New StatusStrip()
         toolStripStatusLabel = New ToolStripStatusLabel()
         toolStripProgressBar = New ToolStripProgressBar()
@@ -70,7 +71,7 @@ Partial Class frmMenu
         ' lblTitle
         ' 
         lblTitle.AutoSize = True
-        lblTitle.Font = New Font("Segoe UI", 18.0F, FontStyle.Bold)
+        lblTitle.Font = New Font("Segoe UI", 18F, FontStyle.Bold)
         lblTitle.ForeColor = Color.White
         lblTitle.Location = New Point(80, 25)
         lblTitle.Name = "lblTitle"
@@ -108,7 +109,7 @@ Partial Class frmMenu
         grpBarcodeInfo.Controls.Add(lblBarcode)
         grpBarcodeInfo.Controls.Add(lblLastScanned)
         grpBarcodeInfo.Controls.Add(lblScanTime)
-        grpBarcodeInfo.Font = New Font("Segoe UI", 10.0F)
+        grpBarcodeInfo.Font = New Font("Segoe UI", 10F)
         grpBarcodeInfo.ForeColor = Color.FromArgb(CByte(52), CByte(73), CByte(94))
         grpBarcodeInfo.Location = New Point(20, 20)
         grpBarcodeInfo.Name = "grpBarcodeInfo"
@@ -119,7 +120,7 @@ Partial Class frmMenu
         ' 
         ' lblBarcodeValue
         ' 
-        lblBarcodeValue.Font = New Font("Consolas", 14.0F, FontStyle.Bold)
+        lblBarcodeValue.Font = New Font("Consolas", 14F, FontStyle.Bold)
         lblBarcodeValue.ForeColor = Color.FromArgb(CByte(46), CByte(125), CByte(50))
         lblBarcodeValue.Location = New Point(20, 80)
         lblBarcodeValue.Name = "lblBarcodeValue"
@@ -130,7 +131,7 @@ Partial Class frmMenu
         ' 
         ' txtBarcode
         ' 
-        txtBarcode.Font = New Font("Consolas", 12.0F)
+        txtBarcode.Font = New Font("Consolas", 12F)
         txtBarcode.Location = New Point(120, 40)
         txtBarcode.Name = "txtBarcode"
         txtBarcode.ReadOnly = True
@@ -141,7 +142,7 @@ Partial Class frmMenu
         ' lblBarcode
         ' 
         lblBarcode.AutoSize = True
-        lblBarcode.Font = New Font("Segoe UI", 10.0F)
+        lblBarcode.Font = New Font("Segoe UI", 10F)
         lblBarcode.Location = New Point(20, 45)
         lblBarcode.Name = "lblBarcode"
         lblBarcode.Size = New Size(94, 19)
@@ -151,7 +152,7 @@ Partial Class frmMenu
         ' lblLastScanned
         ' 
         lblLastScanned.AutoSize = True
-        lblLastScanned.Font = New Font("Segoe UI", 9.0F)
+        lblLastScanned.Font = New Font("Segoe UI", 9F)
         lblLastScanned.ForeColor = Color.FromArgb(CByte(108), CByte(117), CByte(125))
         lblLastScanned.Location = New Point(20, 110)
         lblLastScanned.Name = "lblLastScanned"
@@ -162,7 +163,7 @@ Partial Class frmMenu
         ' lblScanTime
         ' 
         lblScanTime.AutoSize = True
-        lblScanTime.Font = New Font("Segoe UI", 9.0F, FontStyle.Bold)
+        lblScanTime.Font = New Font("Segoe UI", 9F, FontStyle.Bold)
         lblScanTime.ForeColor = Color.FromArgb(CByte(108), CByte(117), CByte(125))
         lblScanTime.Location = New Point(120, 110)
         lblScanTime.Name = "lblScanTime"
@@ -175,7 +176,7 @@ Partial Class frmMenu
         grpStatus.Controls.Add(lblStatusValue)
         grpStatus.Controls.Add(picStatusIcon)
         grpStatus.Controls.Add(lblStatus)
-        grpStatus.Font = New Font("Segoe UI", 10.0F)
+        grpStatus.Font = New Font("Segoe UI", 10F)
         grpStatus.ForeColor = Color.FromArgb(CByte(52), CByte(73), CByte(94))
         grpStatus.Location = New Point(20, 180)
         grpStatus.Name = "grpStatus"
@@ -186,7 +187,7 @@ Partial Class frmMenu
         ' 
         ' lblStatusValue
         ' 
-        lblStatusValue.Font = New Font("Segoe UI", 11.0F, FontStyle.Bold)
+        lblStatusValue.Font = New Font("Segoe UI", 11F, FontStyle.Bold)
         lblStatusValue.ForeColor = Color.FromArgb(CByte(255), CByte(159), CByte(67))
         lblStatusValue.Location = New Point(120, 35)
         lblStatusValue.Name = "lblStatusValue"
@@ -207,7 +208,7 @@ Partial Class frmMenu
         ' lblStatus
         ' 
         lblStatus.AutoSize = True
-        lblStatus.Font = New Font("Segoe UI", 10.0F)
+        lblStatus.Font = New Font("Segoe UI", 10F)
         lblStatus.Location = New Point(20, 38)
         lblStatus.Name = "lblStatus"
         lblStatus.Size = New Size(50, 19)
@@ -220,6 +221,7 @@ Partial Class frmMenu
         pnlButtons.Controls.Add(btnClear)
         pnlButtons.Controls.Add(btnSettings)
         pnlButtons.Controls.Add(btnExit)
+        pnlButtons.Controls.Add(btnHistory)
         pnlButtons.Dock = DockStyle.Bottom
         pnlButtons.Location = New Point(0, 400)
         pnlButtons.Name = "pnlButtons"
@@ -232,7 +234,7 @@ Partial Class frmMenu
         btnClear.BackColor = Color.FromArgb(CByte(108), CByte(117), CByte(125))
         btnClear.FlatAppearance.BorderSize = 0
         btnClear.FlatStyle = FlatStyle.Flat
-        btnClear.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold)
+        btnClear.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
         btnClear.ForeColor = Color.White
         btnClear.Location = New Point(20, 15)
         btnClear.Name = "btnClear"
@@ -246,7 +248,7 @@ Partial Class frmMenu
         btnSettings.BackColor = Color.FromArgb(CByte(52), CByte(152), CByte(219))
         btnSettings.FlatAppearance.BorderSize = 0
         btnSettings.FlatStyle = FlatStyle.Flat
-        btnSettings.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold)
+        btnSettings.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
         btnSettings.ForeColor = Color.White
         btnSettings.Location = New Point(250, 15)
         btnSettings.Name = "btnSettings"
@@ -260,7 +262,7 @@ Partial Class frmMenu
         btnExit.BackColor = Color.FromArgb(CByte(231), CByte(76), CByte(60))
         btnExit.FlatAppearance.BorderSize = 0
         btnExit.FlatStyle = FlatStyle.Flat
-        btnExit.Font = New Font("Segoe UI", 10.0F, FontStyle.Bold)
+        btnExit.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
         btnExit.ForeColor = Color.White
         btnExit.Location = New Point(480, 15)
         btnExit.Name = "btnExit"
@@ -268,6 +270,20 @@ Partial Class frmMenu
         btnExit.TabIndex = 2
         btnExit.Text = "❌ Exit"
         btnExit.UseVisualStyleBackColor = False
+        ' 
+        ' btnHistory
+        ' 
+        btnHistory.BackColor = Color.FromArgb(CByte(52), CByte(152), CByte(219))
+        btnHistory.FlatAppearance.BorderSize = 0
+        btnHistory.FlatStyle = FlatStyle.Flat
+        btnHistory.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
+        btnHistory.ForeColor = Color.White
+        btnHistory.Location = New Point(360, 15)
+        btnHistory.Name = "btnHistory"
+        btnHistory.Size = New Size(100, 35)
+        btnHistory.TabIndex = 3
+        btnHistory.Text = "📋 ประวัติ"
+        btnHistory.UseVisualStyleBackColor = False
         ' 
         ' statusStrip
         ' 
@@ -299,7 +315,7 @@ Partial Class frmMenu
         ' 
         ' frmMenu
         ' 
-        AutoScaleDimensions = New SizeF(7.0F, 15.0F)
+        AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         BackColor = Color.White
         ClientSize = New Size(600, 482)
@@ -307,7 +323,7 @@ Partial Class frmMenu
         Controls.Add(pnlButtons)
         Controls.Add(pnlHeader)
         Controls.Add(statusStrip)
-        Font = New Font("Segoe UI", 9.0F)
+        Font = New Font("Segoe UI", 9F)
         FormBorderStyle = FormBorderStyle.FixedSingle
         MaximizeBox = False
         Name = "frmMenu"
@@ -352,5 +368,6 @@ Partial Class frmMenu
     Friend WithEvents toolStripStatusLabel As ToolStripStatusLabel
     Friend WithEvents toolStripProgressBar As ToolStripProgressBar
     Friend WithEvents timerStatus As Timer
+    Friend WithEvents btnHistory As Button
 
 End Class
