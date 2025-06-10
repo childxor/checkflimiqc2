@@ -1,540 +1,460 @@
-﻿Public Class frmHistory
+﻿<Global.Microsoft.VisualBasic.CompilerServices.DesignerGenerated()>
+Partial Class frmHistory
+    Inherits System.Windows.Forms.Form
 
-#Region "Variables"
-    Private scanHistory As List(Of ScanDataRecord)
-    Private filteredHistory As List(Of ScanDataRecord)
-#End Region
-
-#Region "Form Events"
-    Private Sub frmHistory_Load(sender As Object, e As EventArgs) Handles MyBase.Load
-        InitializeForm()
-        SetupDataGridView()
-        LoadScanHistory()
-    End Sub
-
-    Private Sub frmHistory_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
-        RefreshData()
-    End Sub
-#End Region
-
-#Region "Initialization"
-    Private Sub InitializeForm()
+    'Form overrides dispose to clean up the component list.
+    <System.Diagnostics.DebuggerNonUserCode()>
+    Protected Overrides Sub Dispose(ByVal disposing As Boolean)
         Try
-            ' ตั้งค่าเริ่มต้นสำหรับ ComboBox
-            cmbStatus.SelectedIndex = 0
-            
-            ' ตั้งค่าวันที่เริ่มต้น
-            dtpFromDate.Value = DateTime.Now.AddDays(-7)
-            dtpToDate.Value = DateTime.Now
-            
-            ' เชื่อม Event Handlers
-            SetupEventHandlers()
-
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการเริ่มต้น: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub SetupEventHandlers()
-        ' Event handlers สำหรับ Filter controls
-        AddHandler txtSearch.TextChanged, AddressOf txtSearch_TextChanged
-        AddHandler cmbStatus.SelectedIndexChanged, AddressOf cmbStatus_SelectedIndexChanged
-        AddHandler dtpFromDate.ValueChanged, AddressOf DateFilter_Changed
-        AddHandler dtpToDate.ValueChanged, AddressOf DateFilter_Changed
-        
-        ' Event handlers สำหรับ Button controls
-        AddHandler btnRefresh.Click, AddressOf btnRefresh_Click
-        AddHandler btnExport.Click, AddressOf btnExport_Click
-        AddHandler btnViewDetail.Click, AddressOf btnViewDetail_Click
-        AddHandler btnDelete.Click, AddressOf btnDelete_Click
-        AddHandler btnExportExcel.Click, AddressOf btnExportExcel_Click
-        
-        ' Event handlers สำหรับ DataGridView
-        AddHandler dgvHistory.SelectionChanged, AddressOf dgvHistory_SelectionChanged
-        AddHandler dgvHistory.CellFormatting, AddressOf dgvHistory_CellFormatting
-        AddHandler dgvHistory.DoubleClick, AddressOf dgvHistory_DoubleClick
-        AddHandler dgvHistory.DataBindingComplete, AddressOf dgvHistory_DataBindingComplete
-    End Sub
-
-    Private Sub SetupDataGridView()
-        Try
-            dgvHistory.Columns.Clear()
-
-            ' สร้างคอลัมน์
-            Dim colDateTime As New DataGridViewTextBoxColumn() With {
-                .Name = "ScanDateTime",
-                .HeaderText = "วันที่/เวลา",
-                .DataPropertyName = "ScanDateTime",
-                .Width = 150,
-                .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "dd/MM/yyyy HH:mm:ss"}
-            }
-            dgvHistory.Columns.Add(colDateTime)
-
-            Dim colProductCode As New DataGridViewTextBoxColumn() With {
-                .Name = "ProductCode",
-                .HeaderText = "รหัสผลิตภัณฑ์",
-                .DataPropertyName = "ProductCode",
-                .Width = 180
-            }
-            dgvHistory.Columns.Add(colProductCode)
-
-            Dim colReferenceCode As New DataGridViewTextBoxColumn() With {
-                .Name = "ReferenceCode",
-                .HeaderText = "รหัสอ้างอิง",
-                .DataPropertyName = "ReferenceCode",
-                .Width = 150
-            }
-            dgvHistory.Columns.Add(colReferenceCode)
-
-            Dim colQuantity As New DataGridViewTextBoxColumn() With {
-                .Name = "Quantity",
-                .HeaderText = "จำนวน",
-                .DataPropertyName = "Quantity",
-                .Width = 80
-            }
-            dgvHistory.Columns.Add(colQuantity)
-
-            Dim colDateCode As New DataGridViewTextBoxColumn() With {
-                .Name = "DateCode",
-                .HeaderText = "วันที่ผลิต",
-                .DataPropertyName = "DateCode",
-                .Width = 100
-            }
-            dgvHistory.Columns.Add(colDateCode)
-
-            ' คอลัมน์สถานะ
-            Dim colStatus As New DataGridViewTextBoxColumn() With {
-                .Name = "Status",
-                .HeaderText = "สถานะ",
-                .Width = 100
-            }
-            dgvHistory.Columns.Add(colStatus)
-
-            Dim colComputerName As New DataGridViewTextBoxColumn() With {
-                .Name = "ComputerName",
-                .HeaderText = "เครื่อง",
-                .DataPropertyName = "ComputerName",
-                .Width = 100
-            }
-            dgvHistory.Columns.Add(colComputerName)
-
-            Dim colUserName As New DataGridViewTextBoxColumn() With {
-                .Name = "UserName",
-                .HeaderText = "ผู้ใช้",
-                .DataPropertyName = "UserName",
-                .Width = 100
-            }
-            dgvHistory.Columns.Add(colUserName)
-
-            Console.WriteLine($"Created {scanHistory.Count} test records")
-
-        Catch ex As Exception
-            Console.WriteLine($"Error creating test data: {ex.Message}")
-            MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างข้อมูลทดสอบ: {ex.Message}")
-        End Try
-    End Sub
-
-    Private Sub RefreshDataGridView()
-        Try
-            If filteredHistory Is Nothing Then
-                Console.WriteLine("filteredHistory is Nothing")
-                Return
+            If disposing AndAlso components IsNot Nothing Then
+                components.Dispose()
             End If
-
-            Console.WriteLine($"Refreshing DataGridView with {filteredHistory.Count} records")
-
-            ' ใช้ BindingSource
-            Dim bindingSource As New BindingSource()
-            bindingSource.DataSource = filteredHistory
-            dgvHistory.DataSource = bindingSource
-
-            ' อัปเดตคอลัมน์สถานะ
-            For Each row As DataGridViewRow In dgvHistory.Rows
-                If row.DataBoundItem IsNot Nothing Then
-                    Dim record As ScanDataRecord = CType(row.DataBoundItem, ScanDataRecord)
-                    If dgvHistory.Columns.Contains("Status") Then
-                        row.Cells("Status").Value = If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")
-                        row.Cells("Status").Style.ForeColor = If(record.IsValid, Color.Green, Color.Red)
-                    End If
-                End If
-            Next
-
-            Console.WriteLine($"DataGridView refreshed. Row count: {dgvHistory.Rows.Count}")
-
-        Catch ex As Exception
-            Console.WriteLine($"Error refreshing DataGridView: {ex.Message}")
-            MessageBox.Show($"เกิดข้อผิดพลาดในการรีเฟรชข้อมูล: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        Finally
+            MyBase.Dispose(disposing)
         End Try
     End Sub
 
-    Private Sub RefreshData()
-        LoadScanHistory()
+    'Required by the Windows Form Designer
+    Private components As System.ComponentModel.IContainer
+
+    'NOTE: The following procedure is required by the Windows Form Designer
+    'It can be modified using the Windows Form Designer.  
+    'Do not modify it using the code editor.
+    <System.Diagnostics.DebuggerStepThrough()>
+    Private Sub InitializeComponent()
+        Me.pnlHeader = New System.Windows.Forms.Panel()
+        Me.lblTitle = New System.Windows.Forms.Label()
+        Me.picIcon = New System.Windows.Forms.PictureBox()
+        Me.pnlFilter = New System.Windows.Forms.Panel()
+        Me.grpFilter = New System.Windows.Forms.GroupBox()
+        Me.lblSearch = New System.Windows.Forms.Label()
+        Me.txtSearch = New System.Windows.Forms.TextBox()
+        Me.lblStatus = New System.Windows.Forms.Label()
+        Me.cmbStatus = New System.Windows.Forms.ComboBox()
+        Me.lblFromDate = New System.Windows.Forms.Label()
+        Me.dtpFromDate = New System.Windows.Forms.DateTimePicker()
+        Me.lblToDate = New System.Windows.Forms.Label()
+        Me.dtpToDate = New System.Windows.Forms.DateTimePicker()
+        Me.btnRefresh = New System.Windows.Forms.Button()
+        Me.pnlMain = New System.Windows.Forms.Panel()
+        Me.dgvHistory = New System.Windows.Forms.DataGridView()
+        Me.pnlButtons = New System.Windows.Forms.Panel()
+        Me.btnViewDetail = New System.Windows.Forms.Button()
+        Me.btnDelete = New System.Windows.Forms.Button()
+        Me.btnExport = New System.Windows.Forms.Button()
+        Me.btnExportExcel = New System.Windows.Forms.Button()
+        Me.btnClose = New System.Windows.Forms.Button()
+        Me.statusStrip = New System.Windows.Forms.StatusStrip()
+        Me.lblCount = New System.Windows.Forms.ToolStripStatusLabel()
+        Me.toolStripProgressBar = New System.Windows.Forms.ToolStripProgressBar()
+        Me.saveFileDialog = New System.Windows.Forms.SaveFileDialog()
+        Me.openFileDialog = New System.Windows.Forms.OpenFileDialog()
+
+        Me.pnlHeader.SuspendLayout()
+        CType(Me.picIcon, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.pnlFilter.SuspendLayout()
+        Me.grpFilter.SuspendLayout()
+        Me.pnlMain.SuspendLayout()
+        CType(Me.dgvHistory, System.ComponentModel.ISupportInitialize).BeginInit()
+        Me.pnlButtons.SuspendLayout()
+        Me.statusStrip.SuspendLayout()
+        Me.SuspendLayout()
+
+        '
+        'pnlHeader
+        '
+        Me.pnlHeader.BackColor = System.Drawing.Color.FromArgb(41, 128, 185)
+        Me.pnlHeader.Controls.Add(Me.lblTitle)
+        Me.pnlHeader.Controls.Add(Me.picIcon)
+        Me.pnlHeader.Dock = System.Windows.Forms.DockStyle.Top
+        Me.pnlHeader.Location = New System.Drawing.Point(0, 0)
+        Me.pnlHeader.Name = "pnlHeader"
+        Me.pnlHeader.Size = New System.Drawing.Size(1200, 60)
+        Me.pnlHeader.TabIndex = 0
+
+        '
+        'lblTitle
+        '
+        Me.lblTitle.AutoSize = True
+        Me.lblTitle.Font = New System.Drawing.Font("Segoe UI", 16.0!, System.Drawing.FontStyle.Bold)
+        Me.lblTitle.ForeColor = System.Drawing.Color.White
+        Me.lblTitle.Location = New System.Drawing.Point(60, 18)
+        Me.lblTitle.Name = "lblTitle"
+        Me.lblTitle.Size = New System.Drawing.Size(298, 30)
+        Me.lblTitle.TabIndex = 1
+        Me.lblTitle.Text = "ประวัติการสแกน QR Code"
+
+        '
+        'picIcon
+        '
+        Me.picIcon.BackColor = System.Drawing.Color.White
+        Me.picIcon.Location = New System.Drawing.Point(15, 15)
+        Me.picIcon.Name = "picIcon"
+        Me.picIcon.Size = New System.Drawing.Size(30, 30)
+        Me.picIcon.SizeMode = System.Windows.Forms.PictureBoxSizeMode.Zoom
+        Me.picIcon.TabIndex = 0
+        Me.picIcon.TabStop = False
+
+        '
+        'pnlFilter
+        '
+        Me.pnlFilter.BackColor = System.Drawing.Color.FromArgb(248, 249, 250)
+        Me.pnlFilter.Controls.Add(Me.grpFilter)
+        Me.pnlFilter.Dock = System.Windows.Forms.DockStyle.Top
+        Me.pnlFilter.Location = New System.Drawing.Point(0, 60)
+        Me.pnlFilter.Name = "pnlFilter"
+        Me.pnlFilter.Padding = New System.Windows.Forms.Padding(10)
+        Me.pnlFilter.Size = New System.Drawing.Size(1200, 100)
+        Me.pnlFilter.TabIndex = 1
+
+        '
+        'grpFilter
+        '
+        Me.grpFilter.Controls.Add(Me.lblSearch)
+        Me.grpFilter.Controls.Add(Me.txtSearch)
+        Me.grpFilter.Controls.Add(Me.lblStatus)
+        Me.grpFilter.Controls.Add(Me.cmbStatus)
+        Me.grpFilter.Controls.Add(Me.lblFromDate)
+        Me.grpFilter.Controls.Add(Me.dtpFromDate)
+        Me.grpFilter.Controls.Add(Me.lblToDate)
+        Me.grpFilter.Controls.Add(Me.dtpToDate)
+        Me.grpFilter.Controls.Add(Me.btnRefresh)
+        Me.grpFilter.Dock = System.Windows.Forms.DockStyle.Fill
+        Me.grpFilter.Font = New System.Drawing.Font("Segoe UI", 9.0!)
+        Me.grpFilter.ForeColor = System.Drawing.Color.FromArgb(52, 73, 94)
+        Me.grpFilter.Location = New System.Drawing.Point(10, 10)
+        Me.grpFilter.Name = "grpFilter"
+        Me.grpFilter.Size = New System.Drawing.Size(1180, 80)
+        Me.grpFilter.TabIndex = 0
+        Me.grpFilter.TabStop = False
+        Me.grpFilter.Text = "กรองข้อมูล"
+
+        '
+        'lblSearch
+        '
+        Me.lblSearch.AutoSize = True
+        Me.lblSearch.Location = New System.Drawing.Point(15, 30)
+        Me.lblSearch.Name = "lblSearch"
+        Me.lblSearch.Size = New System.Drawing.Size(32, 15)
+        Me.lblSearch.TabIndex = 0
+        Me.lblSearch.Text = "ค้นหา:"
+
+        '
+        'txtSearch
+        '
+        Me.txtSearch.Font = New System.Drawing.Font("Segoe UI", 9.0!)
+        Me.txtSearch.Location = New System.Drawing.Point(15, 48)
+        Me.txtSearch.Name = "txtSearch"
+        Me.txtSearch.Size = New System.Drawing.Size(200, 23)
+        Me.txtSearch.TabIndex = 1
+
+        '
+        'lblStatus
+        '
+        Me.lblStatus.AutoSize = True
+        Me.lblStatus.Location = New System.Drawing.Point(235, 30)
+        Me.lblStatus.Name = "lblStatus"
+        Me.lblStatus.Size = New System.Drawing.Size(39, 15)
+        Me.lblStatus.TabIndex = 2
+        Me.lblStatus.Text = "สถานะ:"
+
+        '
+        'cmbStatus
+        '
+        Me.cmbStatus.DropDownStyle = System.Windows.Forms.ComboBoxStyle.DropDownList
+        Me.cmbStatus.Font = New System.Drawing.Font("Segoe UI", 9.0!)
+        Me.cmbStatus.FormattingEnabled = True
+        Me.cmbStatus.Items.AddRange(New Object() {"ทั้งหมด", "ถูกต้อง", "ไม่ถูกต้อง"})
+        Me.cmbStatus.Location = New System.Drawing.Point(235, 48)
+        Me.cmbStatus.Name = "cmbStatus"
+        Me.cmbStatus.Size = New System.Drawing.Size(120, 23)
+        Me.cmbStatus.TabIndex = 3
+
+        '
+        'lblFromDate
+        '
+        Me.lblFromDate.AutoSize = True
+        Me.lblFromDate.Location = New System.Drawing.Point(375, 30)
+        Me.lblFromDate.Name = "lblFromDate"
+        Me.lblFromDate.Size = New System.Drawing.Size(50, 15)
+        Me.lblFromDate.TabIndex = 4
+        Me.lblFromDate.Text = "วันที่เริ่ม:"
+
+        '
+        'dtpFromDate
+        '
+        Me.dtpFromDate.Font = New System.Drawing.Font("Segoe UI", 9.0!)
+        Me.dtpFromDate.Format = System.Windows.Forms.DateTimePickerFormat.Short
+        Me.dtpFromDate.Location = New System.Drawing.Point(375, 48)
+        Me.dtpFromDate.Name = "dtpFromDate"
+        Me.dtpFromDate.Size = New System.Drawing.Size(120, 23)
+        Me.dtpFromDate.TabIndex = 5
+
+        '
+        'lblToDate
+        '
+        Me.lblToDate.AutoSize = True
+        Me.lblToDate.Location = New System.Drawing.Point(515, 30)
+        Me.lblToDate.Name = "lblToDate"
+        Me.lblToDate.Size = New System.Drawing.Size(53, 15)
+        Me.lblToDate.TabIndex = 6
+        Me.lblToDate.Text = "วันที่สิ้นสุด:"
+
+        '
+        'dtpToDate
+        '
+        Me.dtpToDate.Font = New System.Drawing.Font("Segoe UI", 9.0!)
+        Me.dtpToDate.Format = System.Windows.Forms.DateTimePickerFormat.Short
+        Me.dtpToDate.Location = New System.Drawing.Point(515, 48)
+        Me.dtpToDate.Name = "dtpToDate"
+        Me.dtpToDate.Size = New System.Drawing.Size(120, 23)
+        Me.dtpToDate.TabIndex = 7
+
+        '
+        'btnRefresh
+        '
+        Me.btnRefresh.BackColor = System.Drawing.Color.FromArgb(52, 152, 219)
+        Me.btnRefresh.FlatAppearance.BorderSize = 0
+        Me.btnRefresh.FlatStyle = System.Windows.Forms.FlatStyle.Flat
+        Me.btnRefresh.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
+        Me.btnRefresh.ForeColor = System.Drawing.Color.White
+        Me.btnRefresh.Location = New System.Drawing.Point(655, 45)
+        Me.btnRefresh.Name = "btnRefresh"
+        Me.btnRefresh.Size = New System.Drawing.Size(100, 28)
+        Me.btnRefresh.TabIndex = 8
+        Me.btnRefresh.Text = "รีเฟรช"
+        Me.btnRefresh.UseVisualStyleBackColor = False
+
+        '
+        'pnlMain
+        '
+        Me.pnlMain.Controls.Add(Me.dgvHistory)
+        Me.pnlMain.Dock = System.Windows.Forms.DockStyle.Fill
+        Me.pnlMain.Location = New System.Drawing.Point(0, 160)
+        Me.pnlMain.Name = "pnlMain"
+        Me.pnlMain.Padding = New System.Windows.Forms.Padding(10, 0, 10, 0)
+        Me.pnlMain.Size = New System.Drawing.Size(1200, 400)
+        Me.pnlMain.TabIndex = 2
+
+        '
+        'dgvHistory
+        '
+        Me.dgvHistory.AllowUserToAddRows = False
+        Me.dgvHistory.AllowUserToDeleteRows = False
+        Me.dgvHistory.AutoSizeColumnsMode = System.Windows.Forms.DataGridViewAutoSizeColumnsMode.Fill
+        Me.dgvHistory.BackgroundColor = System.Drawing.Color.White
+        Me.dgvHistory.BorderStyle = System.Windows.Forms.BorderStyle.None
+        Me.dgvHistory.ColumnHeadersHeight = 35
+        Me.dgvHistory.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.DisableResizing
+        Me.dgvHistory.Dock = System.Windows.Forms.DockStyle.Fill
+        Me.dgvHistory.Font = New System.Drawing.Font("Segoe UI", 9.0!)
+        Me.dgvHistory.GridColor = System.Drawing.Color.FromArgb(224, 224, 224)
+        Me.dgvHistory.Location = New System.Drawing.Point(10, 0)
+        Me.dgvHistory.MultiSelect = False
+        Me.dgvHistory.Name = "dgvHistory"
+        Me.dgvHistory.ReadOnly = True
+        Me.dgvHistory.RowHeadersVisible = False
+        Me.dgvHistory.RowTemplate.Height = 30
+        Me.dgvHistory.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect
+        Me.dgvHistory.Size = New System.Drawing.Size(1180, 400)
+        Me.dgvHistory.TabIndex = 0
+
+        '
+        'pnlButtons
+        '
+        Me.pnlButtons.BackColor = System.Drawing.Color.White
+        Me.pnlButtons.Controls.Add(Me.btnViewDetail)
+        Me.pnlButtons.Controls.Add(Me.btnDelete)
+        Me.pnlButtons.Controls.Add(Me.btnExport)
+        Me.pnlButtons.Controls.Add(Me.btnExportExcel)
+        Me.pnlButtons.Controls.Add(Me.btnClose)
+        Me.pnlButtons.Dock = System.Windows.Forms.DockStyle.Bottom
+        Me.pnlButtons.Location = New System.Drawing.Point(0, 560)
+        Me.pnlButtons.Name = "pnlButtons"
+        Me.pnlButtons.Padding = New System.Windows.Forms.Padding(10)
+        Me.pnlButtons.Size = New System.Drawing.Size(1200, 60)
+        Me.pnlButtons.TabIndex = 3
+
+        '
+        'btnViewDetail
+        '
+        Me.btnViewDetail.BackColor = System.Drawing.Color.FromArgb(52, 152, 219)
+        Me.btnViewDetail.Enabled = False
+        Me.btnViewDetail.FlatAppearance.BorderSize = 0
+        Me.btnViewDetail.FlatStyle = System.Windows.Forms.FlatStyle.Flat
+        Me.btnViewDetail.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
+        Me.btnViewDetail.ForeColor = System.Drawing.Color.White
+        Me.btnViewDetail.Location = New System.Drawing.Point(15, 15)
+        Me.btnViewDetail.Name = "btnViewDetail"
+        Me.btnViewDetail.Size = New System.Drawing.Size(120, 35)
+        Me.btnViewDetail.TabIndex = 0
+        Me.btnViewDetail.Text = "ดูรายละเอียด"
+        Me.btnViewDetail.UseVisualStyleBackColor = False
+
+        '
+        'btnDelete
+        '
+        Me.btnDelete.BackColor = System.Drawing.Color.FromArgb(231, 76, 60)
+        Me.btnDelete.Enabled = False
+        Me.btnDelete.FlatAppearance.BorderSize = 0
+        Me.btnDelete.FlatStyle = System.Windows.Forms.FlatStyle.Flat
+        Me.btnDelete.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
+        Me.btnDelete.ForeColor = System.Drawing.Color.White
+        Me.btnDelete.Location = New System.Drawing.Point(145, 15)
+        Me.btnDelete.Name = "btnDelete"
+        Me.btnDelete.Size = New System.Drawing.Size(100, 35)
+        Me.btnDelete.TabIndex = 1
+        Me.btnDelete.Text = "ลบ"
+        Me.btnDelete.UseVisualStyleBackColor = False
+
+        '
+        'btnExport
+        '
+        Me.btnExport.BackColor = System.Drawing.Color.FromArgb(46, 125, 50)
+        Me.btnExport.FlatAppearance.BorderSize = 0
+        Me.btnExport.FlatStyle = System.Windows.Forms.FlatStyle.Flat
+        Me.btnExport.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
+        Me.btnExport.ForeColor = System.Drawing.Color.White
+        Me.btnExport.Location = New System.Drawing.Point(255, 15)
+        Me.btnExport.Name = "btnExport"
+        Me.btnExport.Size = New System.Drawing.Size(100, 35)
+        Me.btnExport.TabIndex = 2
+        Me.btnExport.Text = "Export CSV"
+        Me.btnExport.UseVisualStyleBackColor = False
+
+        '
+        'btnExportExcel
+        '
+        Me.btnExportExcel.BackColor = System.Drawing.Color.FromArgb(46, 125, 50)
+        Me.btnExportExcel.FlatAppearance.BorderSize = 0
+        Me.btnExportExcel.FlatStyle = System.Windows.Forms.FlatStyle.Flat
+        Me.btnExportExcel.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
+        Me.btnExportExcel.ForeColor = System.Drawing.Color.White
+        Me.btnExportExcel.Location = New System.Drawing.Point(365, 15)
+        Me.btnExportExcel.Name = "btnExportExcel"
+        Me.btnExportExcel.Size = New System.Drawing.Size(110, 35)
+        Me.btnExportExcel.TabIndex = 3
+        Me.btnExportExcel.Text = "Export Excel"
+        Me.btnExportExcel.UseVisualStyleBackColor = False
+
+        '
+        'btnClose
+        '
+        Me.btnClose.Anchor = CType((System.Windows.Forms.AnchorStyles.Top Or System.Windows.Forms.AnchorStyles.Right), System.Windows.Forms.AnchorStyles)
+        Me.btnClose.BackColor = System.Drawing.Color.FromArgb(108, 117, 125)
+        Me.btnClose.DialogResult = System.Windows.Forms.DialogResult.Cancel
+        Me.btnClose.FlatAppearance.BorderSize = 0
+        Me.btnClose.FlatStyle = System.Windows.Forms.FlatStyle.Flat
+        Me.btnClose.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
+        Me.btnClose.ForeColor = System.Drawing.Color.White
+        Me.btnClose.Location = New System.Drawing.Point(1085, 15)
+        Me.btnClose.Name = "btnClose"
+        Me.btnClose.Size = New System.Drawing.Size(100, 35)
+        Me.btnClose.TabIndex = 4
+        Me.btnClose.Text = "ปิด"
+        Me.btnClose.UseVisualStyleBackColor = False
+
+        '
+        'statusStrip
+        '
+        Me.statusStrip.BackColor = System.Drawing.Color.FromArgb(236, 240, 241)
+        Me.statusStrip.Items.AddRange(New System.Windows.Forms.ToolStripItem() {Me.lblCount, Me.toolStripProgressBar})
+        Me.statusStrip.Location = New System.Drawing.Point(0, 620)
+        Me.statusStrip.Name = "statusStrip"
+        Me.statusStrip.Size = New System.Drawing.Size(1200, 22)
+        Me.statusStrip.TabIndex = 4
+
+        '
+        'lblCount
+        '
+        Me.lblCount.Name = "lblCount"
+        Me.lblCount.Size = New System.Drawing.Size(1085, 17)
+        Me.lblCount.Spring = True
+        Me.lblCount.Text = "จำนวนรายการ: 0"
+        Me.lblCount.TextAlign = System.Drawing.ContentAlignment.MiddleLeft
+
+        '
+        'toolStripProgressBar
+        '
+        Me.toolStripProgressBar.Name = "toolStripProgressBar"
+        Me.toolStripProgressBar.Size = New System.Drawing.Size(100, 16)
+        Me.toolStripProgressBar.Visible = False
+
+        '
+        'saveFileDialog
+        '
+        Me.saveFileDialog.DefaultExt = "csv"
+        Me.saveFileDialog.Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*"
+        Me.saveFileDialog.Title = "ส่งออกข้อมูล"
+
+        '
+        'openFileDialog
+        '
+        Me.openFileDialog.Filter = "Excel Files (*.xlsx)|*.xlsx|CSV Files (*.csv)|*.csv|All Files (*.*)|*.*"
+        Me.openFileDialog.Title = "เลือกไฟล์"
+
+        '
+        'frmHistory
+        '
+        Me.AcceptButton = Me.btnRefresh
+        Me.AutoScaleDimensions = New System.Drawing.SizeF(7.0!, 15.0!)
+        Me.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font
+        Me.BackColor = System.Drawing.Color.White
+        Me.CancelButton = Me.btnClose
+        Me.ClientSize = New System.Drawing.Size(1200, 642)
+        Me.Controls.Add(Me.pnlMain)
+        Me.Controls.Add(Me.pnlButtons)
+        Me.Controls.Add(Me.pnlFilter)
+        Me.Controls.Add(Me.pnlHeader)
+        Me.Controls.Add(Me.statusStrip)
+        Me.Font = New System.Drawing.Font("Segoe UI", 9.0!)
+        Me.MinimumSize = New System.Drawing.Size(1000, 600)
+        Me.Name = "frmHistory"
+        Me.StartPosition = System.Windows.Forms.FormStartPosition.CenterParent
+        Me.Text = "ประวัติการสแกน QR Code - Barcode Scanner System"
+
+        Me.pnlHeader.ResumeLayout(False)
+        Me.pnlHeader.PerformLayout()
+        CType(Me.picIcon, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.pnlFilter.ResumeLayout(False)
+        Me.grpFilter.ResumeLayout(False)
+        Me.grpFilter.PerformLayout()
+        Me.pnlMain.ResumeLayout(False)
+        CType(Me.dgvHistory, System.ComponentModel.ISupportInitialize).EndInit()
+        Me.pnlButtons.ResumeLayout(False)
+        Me.statusStrip.ResumeLayout(False)
+        Me.statusStrip.PerformLayout()
+        Me.ResumeLayout(False)
+        Me.PerformLayout()
     End Sub
 
-    Private Sub UpdateRecordCount()
-        Try
-            lblCount.Text = $"จำนวนรายการ: {If(filteredHistory?.Count, 0)} จาก {If(scanHistory?.Count, 0)} รายการทั้งหมด"
-            Console.WriteLine(lblCount.Text)
-        Catch ex As Exception
-            Console.WriteLine($"Error updating record count: {ex.Message}")
-        End Try
-    End Sub
-#End Region
+    ' Control declarations
+    Friend WithEvents pnlHeader As Panel
+    Friend WithEvents lblTitle As Label
+    Friend WithEvents picIcon As PictureBox
+    Friend WithEvents pnlFilter As Panel
+    Friend WithEvents grpFilter As GroupBox
+    Friend WithEvents lblSearch As Label
+    Friend WithEvents txtSearch As TextBox
+    Friend WithEvents lblStatus As Label
+    Friend WithEvents cmbStatus As ComboBox
+    Friend WithEvents lblFromDate As Label
+    Friend WithEvents dtpFromDate As DateTimePicker
+    Friend WithEvents lblToDate As Label
+    Friend WithEvents dtpToDate As DateTimePicker
+    Friend WithEvents btnRefresh As Button
+    Friend WithEvents pnlMain As Panel
+    Friend WithEvents dgvHistory As DataGridView
+    Friend WithEvents pnlButtons As Panel
+    Friend WithEvents btnViewDetail As Button
+    Friend WithEvents btnDelete As Button
+    Friend WithEvents btnExport As Button
+    Friend WithEvents btnExportExcel As Button
+    Friend WithEvents btnClose As Button
+    Friend WithEvents statusStrip As StatusStrip
+    Friend WithEvents lblCount As ToolStripStatusLabel
+    Friend WithEvents toolStripProgressBar As ToolStripProgressBar
+    Friend WithEvents saveFileDialog As SaveFileDialog
+    Friend WithEvents openFileDialog As OpenFileDialog
 
-#Region "Event Handlers"
-    Private Sub dgvHistory_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
-        Try
-            Console.WriteLine($"DataBindingComplete fired. Rows: {dgvHistory.Rows.Count}")
-
-            If dgvHistory.Rows.Count = 0 Then
-                Console.WriteLine("No rows in DataGridView after binding")
-            Else
-                Console.WriteLine("DataGridView has data, updating status column...")
-
-                ' อัปเดตคอลัมน์สถานะ
-                For Each row As DataGridViewRow In dgvHistory.Rows
-                    If row.DataBoundItem IsNot Nothing Then
-                        Dim record As ScanDataRecord = CType(row.DataBoundItem, ScanDataRecord)
-                        If dgvHistory.Columns.Contains("Status") Then
-                            row.Cells("Status").Value = If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")
-                            row.Cells("Status").Style.ForeColor = If(record.IsValid, Color.Green, Color.Red)
-                        End If
-                    End If
-                Next
-            End If
-
-        Catch ex As Exception
-            Console.WriteLine($"Error in DataBindingComplete: {ex.Message}")
-        End Try
-    End Sub
-
-    Private Sub dgvHistory_SelectionChanged(sender As Object, e As EventArgs)
-        Try
-            Dim hasSelection As Boolean = dgvHistory.SelectedRows.Count > 0
-            btnViewDetail.Enabled = hasSelection
-            btnDelete.Enabled = hasSelection
-
-        Catch ex As Exception
-            Console.WriteLine($"Error in selection changed: {ex.Message}")
-        End Try
-    End Sub
-
-    Private Sub dgvHistory_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs)
-        Try
-            ' เปลี่ยนสีแถวตามสถานะ
-            If e.RowIndex >= 0 AndAlso dgvHistory.Rows(e.RowIndex).DataBoundItem IsNot Nothing Then
-                Dim record As ScanDataRecord = CType(dgvHistory.Rows(e.RowIndex).DataBoundItem, ScanDataRecord)
-                If Not record.IsValid Then
-                    dgvHistory.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.FromArgb(255, 235, 235)
-                End If
-            End If
-
-        Catch ex As Exception
-            Console.WriteLine($"Error in cell formatting: {ex.Message}")
-        End Try
-    End Sub
-
-    Private Sub dgvHistory_DoubleClick(sender As Object, e As EventArgs)
-        btnViewDetail_Click(sender, e)
-    End Sub
-
-    Private Sub btnRefresh_Click(sender As Object, e As EventArgs)
-        RefreshData()
-    End Sub
-
-    Private Sub btnViewDetail_Click(sender As Object, e As EventArgs)
-        Try
-            If dgvHistory.SelectedRows.Count = 0 Then Return
-
-            Dim selectedRecord As ScanDataRecord = CType(dgvHistory.SelectedRows(0).DataBoundItem, ScanDataRecord)
-            ShowDetailDialog(selectedRecord)
-
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการแสดงรายละเอียด: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub btnDelete_Click(sender As Object, e As EventArgs)
-        Try
-            If dgvHistory.SelectedRows.Count = 0 Then Return
-
-            Dim result As DialogResult = MessageBox.Show(
-                "คุณต้องการลบรายการนี้หรือไม่?",
-                "ยืนยันการลบ",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question)
-
-            If result = DialogResult.Yes Then
-                MessageBox.Show("ฟีเจอร์การลบจะถูกเพิ่มในเวอร์ชันถัดไป", "แจ้งเตือน",
-                              MessageBoxButtons.OK, MessageBoxIcon.Information)
-            End If
-
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการลบข้อมูล: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub btnExport_Click(sender As Object, e As EventArgs)
-        Try
-            ExportToCSV()
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการส่งออกข้อมูล: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub btnExportExcel_Click(sender As Object, e As EventArgs)
-        Try
-            MessageBox.Show("ฟีเจอร์ส่งออก Excel จะถูกเพิ่มในเวอร์ชันถัดไป", "แจ้งเตือน",
-                          MessageBoxButtons.OK, MessageBoxIcon.Information)
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาด: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-#End Region
-
-#Region "Filter and Search"
-    Private Sub ApplyFilters()
-        Try
-            If scanHistory Is Nothing Then Return
-
-            filteredHistory = New List(Of ScanDataRecord)(scanHistory)
-
-            ' กรองตามข้อความค้นหา
-            If Not String.IsNullOrEmpty(txtSearch.Text) Then
-                Dim searchText As String = txtSearch.Text.ToLower()
-                filteredHistory = filteredHistory.Where(Function(x)
-                                                            Return x.ProductCode.ToLower().Contains(searchText) OrElse
-                                                                  x.ReferenceCode.ToLower().Contains(searchText) OrElse
-                                                                  x.OriginalData.ToLower().Contains(searchText) OrElse
-                                                                  x.ExtractedData.ToLower().Contains(searchText)
-                                                        End Function).ToList()
-            End If
-
-            ' กรองตามสถานะ
-            If cmbStatus.SelectedIndex > 0 Then
-                Dim isValid As Boolean = (cmbStatus.SelectedIndex = 1)
-                filteredHistory = filteredHistory.Where(Function(x) x.IsValid = isValid).ToList()
-            End If
-
-            ' กรองตามช่วงวันที่
-            Dim fromDate As DateTime = dtpFromDate.Value.Date
-            Dim toDate As DateTime = dtpToDate.Value.Date.AddDays(1).AddSeconds(-1)
-
-            filteredHistory = filteredHistory.Where(Function(x)
-                                                       Return x.ScanDateTime >= fromDate AndAlso x.ScanDateTime <= toDate
-                                                   End Function).ToList()
-
-            RefreshDataGridView()
-            UpdateRecordCount()
-
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการกรองข้อมูล: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub txtSearch_TextChanged(sender As Object, e As EventArgs)
-        ApplyFilters()
-    End Sub
-
-    Private Sub cmbStatus_SelectedIndexChanged(sender As Object, e As EventArgs)
-        ApplyFilters()
-    End Sub
-
-    Private Sub DateFilter_Changed(sender As Object, e As EventArgs)
-        ApplyFilters()
-    End Sub
-#End Region
-
-#Region "Utility Methods"
-    Private Sub ShowDetailDialog(record As ScanDataRecord)
-        Try
-            Dim detailForm As New Form() With {
-                .Text = "รายละเอียดการสแกน",
-                .Size = New Size(600, 500),
-                .StartPosition = FormStartPosition.CenterParent,
-                .FormBorderStyle = FormBorderStyle.FixedDialog,
-                .MaximizeBox = False,
-                .MinimizeBox = False
-            }
-
-            ' สร้าง TextBox แสดงรายละเอียด
-            Dim txtDetail As New TextBox() With {
-                .Multiline = True,
-                .ScrollBars = ScrollBars.Vertical,
-                .ReadOnly = True,
-                .Dock = DockStyle.Fill,
-                .Font = New Font("Consolas", 10),
-                .Margin = New Padding(10)
-            }
-
-            ' สร้างข้อความรายละเอียด
-            Dim details As New System.Text.StringBuilder()
-            details.AppendLine("=== รายละเอียดการสแกน QR Code ===")
-            details.AppendLine()
-            details.AppendLine($"วันที่/เวลา: {record.ScanDateTime:dd/MM/yyyy HH:mm:ss}")
-            details.AppendLine($"สถานะ: {If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")}")
-            details.AppendLine()
-            details.AppendLine("ข้อมูลที่ดึงออกมา:")
-            details.AppendLine($"  รหัสผลิตภัณฑ์: {record.ProductCode}")
-            details.AppendLine($"  รหัสอ้างอิง: {record.ReferenceCode}")
-            details.AppendLine($"  จำนวน: {record.Quantity}")
-            details.AppendLine($"  วันที่ผลิต: {record.DateCode}")
-            details.AppendLine()
-            details.AppendLine($"เครื่องที่สแกน: {record.ComputerName}")
-            details.AppendLine($"ผู้ใช้: {record.UserName}")
-            details.AppendLine()
-
-            If Not String.IsNullOrEmpty(record.ValidationMessages) Then
-                details.AppendLine("ข้อความเตือน:")
-                details.AppendLine(record.ValidationMessages)
-                details.AppendLine()
-            End If
-
-            details.AppendLine("ข้อมูลต้นฉบับ:")
-            details.AppendLine(record.OriginalData)
-
-            txtDetail.Text = details.ToString()
-
-            ' เพิ่ม panel สำหรับปุ่ม
-            Dim pnlDetailButtons As New Panel() With {
-                .Height = 50,
-                .Dock = DockStyle.Bottom
-            }
-
-            Dim btnDetailClose As New Button() With {
-                .Text = "ปิด",
-                .Size = New Size(75, 30),
-                .Location = New Point(detailForm.Width - 95, 10),
-                .Anchor = AnchorStyles.Top Or AnchorStyles.Right,
-                .DialogResult = DialogResult.OK
-            }
-
-            pnlDetailButtons.Controls.Add(btnDetailClose)
-            detailForm.Controls.Add(pnlDetailButtons)
-            detailForm.Controls.Add(txtDetail)
-
-            detailForm.ShowDialog()
-            detailForm.Dispose()
-
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการแสดงรายละเอียด: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub ExportToCSV()
-        Try
-            Dim saveDialog As New SaveFileDialog() With {
-                .Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*",
-                .Title = "ส่งออกข้อมูลเป็น CSV",
-                .FileName = $"ScanHistory_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
-            }
-
-            If saveDialog.ShowDialog() = DialogResult.OK Then
-                Using writer As New IO.StreamWriter(saveDialog.FileName, False, System.Text.Encoding.UTF8)
-                    ' เขียน header
-                    writer.WriteLine("วันที่/เวลา,รหัสผลิตภัณฑ์,รหัสอ้างอิง,จำนวน,วันที่ผลิต,สถานะ,เครื่อง,ผู้ใช้,ข้อมูลต้นฉบับ")
-
-                    ' เขียนข้อมูล
-                    For Each record As ScanDataRecord In filteredHistory
-                        Dim line As String = $"""{record.ScanDateTime:dd/MM/yyyy HH:mm:ss}"",""{record.ProductCode}"",""{record.ReferenceCode}"",""{record.Quantity}"",""{record.DateCode}"",""{If(record.IsValid, "ถูกต้อง", "ไม่ถูกต้อง")}"",""{record.ComputerName}"",""{record.UserName}"",""{record.OriginalData.Replace("""", """""")}"""
-                        writer.WriteLine(line)
-                    Next
-                End Using
-
-                MessageBox.Show($"ส่งออกข้อมูลเรียบร้อยแล้ว" & vbNewLine & $"ไฟล์: {saveDialog.FileName}",
-                              "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information)
-            End If
-
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการส่งออกข้อมูล: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-#End Region
-
-End Class.WriteLine("DataGridView setup completed with " & dgvHistory.Columns.Count & " columns")
-
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการตั้งค่า DataGridView: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-#End Region
-
-#Region "Data Management"
-    Private Sub LoadScanHistory()
-        Try
-            Console.WriteLine("Loading scan history...")
-
-            ' ตรวจสอบการเชื่อมต่อฐานข้อมูล
-            If Not DatabaseManager.IsConnected Then
-                Console.WriteLine("Database not connected, attempting to initialize...")
-                If Not DatabaseManager.Initialize() Then
-                    MessageBox.Show("ไม่สามารถเชื่อมต่อฐานข้อมูลได้", "ข้อผิดพลาด")
-                    ' สร้างข้อมูลทดสอบ
-                    CreateTestData()
-                    Return
-                End If
-            End If
-
-            scanHistory = DatabaseManager.GetScanHistory(1000)
-            Console.WriteLine($"Loaded {scanHistory.Count} records from database")
-
-            ' ถ้าไม่มีข้อมูลจากฐานข้อมูล ให้สร้างข้อมูลทดสอบ
-            If scanHistory.Count = 0 Then
-                CreateTestData()
-            End If
-
-            filteredHistory = New List(Of ScanDataRecord)(scanHistory)
-            RefreshDataGridView()
-            UpdateRecordCount()
-
-        Catch ex As Exception
-            Console.WriteLine($"Error loading data: {ex.Message}")
-            MessageBox.Show($"เกิดข้อผิดพลาดในการโหลดข้อมูล: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            ' สร้างข้อมูลทดสอบในกรณีมีปัญหา
-            CreateTestData()
-        End Try
-    End Sub
-
-    ''' <summary>
-    ''' สร้างข้อมูลทดสอบเมื่อไม่มีข้อมูลจากฐานข้อมูล
-    ''' </summary>
-    Private Sub CreateTestData()
-        Try
-            Console.WriteLine("Creating test data...")
-            scanHistory = New List(Of ScanDataRecord)()
-
-            ' สร้างข้อมูลทดสอบ 10 รายการ
-            For i As Integer = 1 To 10
-                Dim testRecord As New ScanDataRecord() With {
-                    .ScanDateTime = DateTime.Now.AddHours(-i),
-                    .OriginalData = $"R00C-19160425501276{i}+Q000060+P20414-00770{i}A000+D20250527+LPT0000000+V00C-191604+U0000000",
-                    .ExtractedData = $"20414-00770{i}A000",
-                    .ProductCode = $"20414-00770{i}A000",
-                    .ReferenceCode = $"00C-19160425501276{i}",
-                    .Quantity = "60",
-                    .DateCode = "20250527",
-                    .IsValid = (i Mod 3 <> 0), ' สลับสถานะ
-                    .ValidationMessages = If(i Mod 3 = 0, "ข้อมูลไม่สมบูรณ์", ""),
-                    .ComputerName = Environment.MachineName,
-                    .UserName = Environment.UserName
-                }
-                scanHistory.Add(testRecord)
-            Next
-
-            filteredHistory = New List(Of ScanDataRecord)(scanHistory)
-            RefreshDataGridView()
-            UpdateRecordCount()
-
-            Console.WriteLine("Test data created successfully")
-            
+End Class
