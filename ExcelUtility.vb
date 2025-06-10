@@ -157,7 +157,7 @@ Public Class ExcelUtility
                                             colCount As Integer) As ExcelMatchResult
         Dim matchResult As New ExcelMatchResult() With {
             .RowNumber = row,
-            .productCode = productCode,
+            .ProductCode = productCode,
             .IsExactMatch = True
         }
 
