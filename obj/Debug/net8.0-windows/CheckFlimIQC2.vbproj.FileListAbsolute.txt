@@ -73,3 +73,4 @@ C:\Users\adisaks\source\repos\CheckFlimIQC2\CheckFlimIQC2\obj\Debug\net8.0-windo
 C:\Users\adisaks\source\repos\CheckFlimIQC2\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFlimIQC2.sourcelink.json
 C:\Users\adisaks\source\repos\CheckFlimIQC2\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFlimIQC2.frmHistory.resources
 C:\Users\adisaks\source\repos\CheckFlimIQC2\CheckFlimIQC2\bin\Debug\net8.0-windows\Microsoft.Office.Interop.Excel.dll
+C:\Users\adisaks\source\repos\CheckFlimIQC2\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFlimIQC2.ExcelSearchResult.resources
