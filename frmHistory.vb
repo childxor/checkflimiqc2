@@ -8,8 +8,8 @@
 #Region "Form Events"
     Private Sub frmHistory_Load(sender As Object, e As EventArgs) Handles MyBase.Load
         InitializeForm()
-        LoadScanHistory()
         SetupDataGridView()
+        LoadScanHistory()
     End Sub
 
     Private Sub frmHistory_Shown(sender As Object, e As EventArgs) Handles MyBase.Shown
@@ -20,14 +20,13 @@
 #Region "Initialization"
     Private Sub InitializeForm()
         Try
-            Me.Text = "ประวัติการสแกน QR Code"
-            Me.Size = New Size(1200, 700)
-            Me.StartPosition = FormStartPosition.CenterParent
-            Me.WindowState = FormWindowState.Normal
-
-            ' สร้าง controls
-            CreateControls()
-            SetupLayout()
+            ' ตั้งค่าเริ่มต้นสำหรับ Controls ที่มีอยู่ใน Designer
+            cmbStatus.SelectedIndex = 0
+            dtpFromDate.Value = DateTime.Now.AddDays(-7)
+            dtpToDate.Value = DateTime.Now
+            
+            ' เชื่อม Event Handlers
+            SetupEventHandlers()
 
         Catch ex As Exception
             MessageBox.Show($"เกิดข้อผิดพลาดในการเริ่มต้น: {ex.Message}",
@@ -35,265 +34,98 @@
         End Try
     End Sub
 
-    Private Sub CreateControls()
-        ' Panel หลัก
-        Dim pnlMain As New Panel() With {
-            .Name = "pnlMain",
-            .Dock = DockStyle.Fill,
-            .Padding = New Padding(10)
-        }
-        Me.Controls.Add(pnlMain)
-
-        ' Panel สำหรับการค้นหาและกรอง
-        Dim pnlFilter As New Panel() With {
-            .Name = "pnlFilter",
-            .Height = 80,
-            .Dock = DockStyle.Top,
-            .BackColor = Color.FromArgb(248, 249, 250)
-        }
-        pnlMain.Controls.Add(pnlFilter)
-
-        ' กล่องค้นหา
-        Dim lblSearch As New Label() With {
-            .Text = "ค้นหา:",
-            .Location = New Point(10, 15),
-            .Size = New Size(50, 23),
-            .TextAlign = ContentAlignment.MiddleLeft
-        }
-        pnlFilter.Controls.Add(lblSearch)
-
-        Dim txtSearch As New TextBox() With {
-            .Name = "txtSearch",
-            .Location = New Point(70, 12),
-            .Size = New Size(300, 23),
-            .PlaceholderText = "ค้นหาด้วยรหัสผลิตภัณฑ์, รหัสอ้างอิง หรือข้อมูล..."
-        }
+    Private Sub SetupEventHandlers()
+        ' Event handlers สำหรับ Filter controls
         AddHandler txtSearch.TextChanged, AddressOf txtSearch_TextChanged
-        pnlFilter.Controls.Add(txtSearch)
-
-        ' ComboBox สำหรับกรองสถานะ
-        Dim lblStatus As New Label() With {
-            .Text = "สถานะ:",
-            .Location = New Point(390, 15),
-            .Size = New Size(50, 23),
-            .TextAlign = ContentAlignment.MiddleLeft
-        }
-        pnlFilter.Controls.Add(lblStatus)
-
-        Dim cmbStatus As New ComboBox() With {
-            .Name = "cmbStatus",
-            .Location = New Point(450, 12),
-            .Size = New Size(120, 23),
-            .DropDownStyle = ComboBoxStyle.DropDownList
-        }
-        cmbStatus.Items.AddRange({"ทั้งหมด", "ถูกต้อง", "ไม่ถูกต้อง"})
-        cmbStatus.SelectedIndex = 0
         AddHandler cmbStatus.SelectedIndexChanged, AddressOf cmbStatus_SelectedIndexChanged
-        pnlFilter.Controls.Add(cmbStatus)
-
-        ' DateTimePicker สำหรับกรองวันที่
-        Dim lblFromDate As New Label() With {
-            .Text = "จาก:",
-            .Location = New Point(590, 15),
-            .Size = New Size(30, 23),
-            .TextAlign = ContentAlignment.MiddleLeft
-        }
-        pnlFilter.Controls.Add(lblFromDate)
-
-        Dim dtpFromDate As New DateTimePicker() With {
-            .Name = "dtpFromDate",
-            .Location = New Point(630, 12),
-            .Size = New Size(120, 23),
-            .Value = DateTime.Now.AddDays(-7)
-        }
         AddHandler dtpFromDate.ValueChanged, AddressOf DateFilter_Changed
-        pnlFilter.Controls.Add(dtpFromDate)
-
-        Dim lblToDate As New Label() With {
-            .Text = "ถึง:",
-            .Location = New Point(760, 15),
-            .Size = New Size(30, 23),
-            .TextAlign = ContentAlignment.MiddleLeft
-        }
-        pnlFilter.Controls.Add(lblToDate)
-
-        Dim dtpToDate As New DateTimePicker() With {
-            .Name = "dtpToDate",
-            .Location = New Point(800, 12),
-            .Size = New Size(120, 23),
-            .Value = DateTime.Now
-        }
         AddHandler dtpToDate.ValueChanged, AddressOf DateFilter_Changed
-        pnlFilter.Controls.Add(dtpToDate)
-
-        ' ปุ่มรีเฟรช
-        Dim btnRefresh As New Button() With {
-            .Name = "btnRefresh",
-            .Text = "🔄 รีเฟรช",
-            .Location = New Point(940, 10),
-            .Size = New Size(80, 27),
-            .UseVisualStyleBackColor = True
-        }
+        
+        ' Event handlers สำหรับ Button controls
         AddHandler btnRefresh.Click, AddressOf btnRefresh_Click
-        pnlFilter.Controls.Add(btnRefresh)
-
-        ' ปุ่มส่งออก
-        Dim btnExport As New Button() With {
-            .Name = "btnExport",
-            .Text = "📤 ส่งออก",
-            .Location = New Point(1030, 10),
-            .Size = New Size(80, 27),
-            .UseVisualStyleBackColor = True
-        }
         AddHandler btnExport.Click, AddressOf btnExport_Click
-        pnlFilter.Controls.Add(btnExport)
-
-        ' Label สำหรับแสดงจำนวนรายการ
-        Dim lblCount As New Label() With {
-            .Name = "lblCount",
-            .Text = "จำนวนรายการ: 0",
-            .Location = New Point(10, 45),
-            .Size = New Size(200, 20),
-            .ForeColor = Color.Gray
-        }
-        pnlFilter.Controls.Add(lblCount)
-
-        ' DataGridView สำหรับแสดงข้อมูล
-        Dim dgvHistory As New DataGridView() With {
-            .Name = "dgvHistory",
-            .Dock = DockStyle.Fill,
-            .AutoGenerateColumns = False,
-            .ReadOnly = True,
-            .AllowUserToAddRows = False,
-            .AllowUserToDeleteRows = False,
-            .SelectionMode = DataGridViewSelectionMode.FullRowSelect,
-            .MultiSelect = False,
-            .RowHeadersVisible = False,
-            .AlternatingRowsDefaultCellStyle = New DataGridViewCellStyle() With {.BackColor = Color.FromArgb(248, 249, 250)}
-        }
-        pnlMain.Controls.Add(dgvHistory)
-
-        ' Panel สำหรับปุ่มด้านล่าง
-        Dim pnlButtons As New Panel() With {
-            .Name = "pnlButtons",
-            .Height = 50,
-            .Dock = DockStyle.Bottom,
-            .BackColor = SystemColors.Control
-        }
-        pnlMain.Controls.Add(pnlButtons)
-
-        ' ปุ่มดูรายละเอียด
-        Dim btnViewDetail As New Button() With {
-            .Name = "btnViewDetail",
-            .Text = "ดูรายละเอียด",
-            .Location = New Point(10, 10),
-            .Size = New Size(100, 30),
-            .Enabled = False
-        }
         AddHandler btnViewDetail.Click, AddressOf btnViewDetail_Click
-        pnlButtons.Controls.Add(btnViewDetail)
-
-        ' ปุ่มลบรายการ
-        Dim btnDelete As New Button() With {
-            .Name = "btnDelete",
-            .Text = "ลบรายการ",
-            .Location = New Point(120, 10),
-            .Size = New Size(100, 30),
-            .Enabled = False,
-            .BackColor = Color.FromArgb(231, 76, 60),
-            .ForeColor = Color.White,
-            .FlatStyle = FlatStyle.Flat
-        }
         AddHandler btnDelete.Click, AddressOf btnDelete_Click
-        pnlButtons.Controls.Add(btnDelete)
-
-        ' ปุ่มปิด
-        Dim btnClose As New Button() With {
-            .Name = "btnClose",
-            .Text = "ปิด",
-            .Location = New Point(Me.Width - 120, 10),
-            .Size = New Size(80, 30),
-            .Anchor = AnchorStyles.Top Or AnchorStyles.Right,
-            .DialogResult = DialogResult.OK
-        }
-        pnlButtons.Controls.Add(btnClose)
-    End Sub
-
-    Private Sub SetupLayout()
-        ' จัดการ layout responsive
-        AddHandler Me.Resize, AddressOf frmHistory_Resize
+        AddHandler btnExportExcel.Click, AddressOf btnExportExcel_Click
+        
+        ' Event handlers สำหรับ DataGridView
+        AddHandler dgvHistory.SelectionChanged, AddressOf dgvHistory_SelectionChanged
+        AddHandler dgvHistory.CellFormatting, AddressOf dgvHistory_CellFormatting
+        AddHandler dgvHistory.DoubleClick, AddressOf dgvHistory_DoubleClick
+        AddHandler dgvHistory.DataBindingComplete, AddressOf dgvHistory_DataBindingComplete
     End Sub
 
     Private Sub SetupDataGridView()
         Try
-            Dim dgv As DataGridView = CType(Me.Controls.Find("dgvHistory", True).FirstOrDefault(), DataGridView)
-            If dgv Is Nothing Then Return
-
-            dgv.Columns.Clear()
+            dgvHistory.Columns.Clear()
 
             ' สร้างคอลัมน์
-            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            Dim colDateTime As New DataGridViewTextBoxColumn() With {
                 .Name = "ScanDateTime",
                 .HeaderText = "วันที่/เวลา",
                 .DataPropertyName = "ScanDateTime",
-                .Width = 120,
+                .Width = 150,
                 .DefaultCellStyle = New DataGridViewCellStyle() With {.Format = "dd/MM/yyyy HH:mm:ss"}
-            })
+            }
+            dgvHistory.Columns.Add(colDateTime)
 
-            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            Dim colProductCode As New DataGridViewTextBoxColumn() With {
                 .Name = "ProductCode",
                 .HeaderText = "รหัสผลิตภัณฑ์",
                 .DataPropertyName = "ProductCode",
-                .Width = 150
-            })
+                .Width = 180
+            }
+            dgvHistory.Columns.Add(colProductCode)
 
-            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            Dim colReferenceCode As New DataGridViewTextBoxColumn() With {
                 .Name = "ReferenceCode",
                 .HeaderText = "รหัสอ้างอิง",
                 .DataPropertyName = "ReferenceCode",
-                .Width = 120
-            })
+                .Width = 150
+            }
+            dgvHistory.Columns.Add(colReferenceCode)
 
-            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            Dim colQuantity As New DataGridViewTextBoxColumn() With {
                 .Name = "Quantity",
                 .HeaderText = "จำนวน",
                 .DataPropertyName = "Quantity",
                 .Width = 80
-            })
+            }
+            dgvHistory.Columns.Add(colQuantity)
 
-            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            Dim colDateCode As New DataGridViewTextBoxColumn() With {
                 .Name = "DateCode",
                 .HeaderText = "วันที่ผลิต",
                 .DataPropertyName = "DateCode",
                 .Width = 100
-            })
-
-            ' คอลัมน์สถานะแบบกราฟิก
-            Dim statusColumn As New DataGridViewImageColumn() With {
-                .Name = "StatusIcon",
-                .HeaderText = "สถานะ",
-                .Width = 60
             }
-            dgv.Columns.Add(statusColumn)
+            dgvHistory.Columns.Add(colDateCode)
 
-            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            ' คอลัมน์สถานะ
+            Dim colStatus As New DataGridViewTextBoxColumn() With {
+                .Name = "Status",
+                .HeaderText = "สถานะ",
+                .Width = 100
+            }
+            dgvHistory.Columns.Add(colStatus)
+
+            Dim colComputerName As New DataGridViewTextBoxColumn() With {
                 .Name = "ComputerName",
                 .HeaderText = "เครื่อง",
                 .DataPropertyName = "ComputerName",
                 .Width = 100
-            })
+            }
+            dgvHistory.Columns.Add(colComputerName)
 
-            dgv.Columns.Add(New DataGridViewTextBoxColumn() With {
+            Dim colUserName As New DataGridViewTextBoxColumn() With {
                 .Name = "UserName",
                 .HeaderText = "ผู้ใช้",
                 .DataPropertyName = "UserName",
                 .Width = 100
-            })
+            }
+            dgvHistory.Columns.Add(colUserName)
 
-            ' เพิ่ม event handlers
-            AddHandler dgv.SelectionChanged, AddressOf dgvHistory_SelectionChanged
-            AddHandler dgv.CellFormatting, AddressOf dgvHistory_CellFormatting
-            AddHandler dgv.DoubleClick, AddressOf dgvHistory_DoubleClick
+            Console.WriteLine("DataGridView setup completed with " & dgvHistory.Columns.Count & " columns")
 
         Catch ex As Exception
             MessageBox.Show($"เกิดข้อผิดพลาดในการตั้งค่า DataGridView: {ex.Message}",
@@ -305,26 +137,102 @@
 #Region "Data Management"
     Private Sub LoadScanHistory()
         Try
+            Console.WriteLine("Loading scan history...")
+
+            ' ตรวจสอบการเชื่อมต่อฐานข้อมูล
+            If Not DatabaseManager.IsConnected Then
+                Console.WriteLine("Database not connected, attempting to initialize...")
+                If Not DatabaseManager.Initialize() Then
+                    MessageBox.Show("ไม่สามารถเชื่อมต่อฐานข้อมูลได้", "ข้อผิดพลาด")
+                    CreateTestData()
+                    Return
+                End If
+            End If
+
             scanHistory = DatabaseManager.GetScanHistory(1000)
+            Console.WriteLine($"Loaded {scanHistory.Count} records from database")
+
+            ' ถ้าไม่มีข้อมูลจากฐานข้อมูล ให้สร้างข้อมูลทดสอบ
+            If scanHistory.Count = 0 Then
+                CreateTestData()
+            End If
+
             filteredHistory = New List(Of ScanDataRecord)(scanHistory)
             RefreshDataGridView()
             UpdateRecordCount()
 
         Catch ex As Exception
+            Console.WriteLine($"Error loading data: {ex.Message}")
             MessageBox.Show($"เกิดข้อผิดพลาดในการโหลดข้อมูล: {ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            CreateTestData()
+        End Try
+    End Sub
+
+    Private Sub CreateTestData()
+        Try
+            Console.WriteLine("Creating test data...")
+            scanHistory = New List(Of ScanDataRecord)()
+
+            ' สร้างข้อมูลทดสอบ 15 รายการ
+            For i As Integer = 1 To 15
+                Dim testRecord As New ScanDataRecord() With {
+                    .ScanDateTime = DateTime.Now.AddHours(-i),
+                    .OriginalData = $"R00C-19160425501276{i}+Q000060+P20414-00770{i}A000+D20250527+LPT0000000+V00C-191604+U0000000",
+                    .ExtractedData = $"20414-00770{i}A000",
+                    .ProductCode = $"20414-00770{i}A000",
+                    .ReferenceCode = $"00C-19160425501276{i}",
+                    .Quantity = "60",
+                    .DateCode = "20250527",
+                    .IsValid = (i Mod 3 <> 0),
+                    .ValidationMessages = If(i Mod 3 = 0, "ข้อมูลไม่สมบูรณ์", ""),
+                    .ComputerName = Environment.MachineName,
+                    .UserName = Environment.UserName
+                }
+                scanHistory.Add(testRecord)
+            Next
+
+            filteredHistory = New List(Of ScanDataRecord)(scanHistory)
+            RefreshDataGridView()
+            UpdateRecordCount()
+
+            Console.WriteLine($"Created {scanHistory.Count} test records")
+
+        Catch ex As Exception
+            Console.WriteLine($"Error creating test data: {ex.Message}")
+            MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างข้อมูลทดสอบ: {ex.Message}")
         End Try
     End Sub
 
     Private Sub RefreshDataGridView()
         Try
-            Dim dgv As DataGridView = CType(Me.Controls.Find("dgvHistory", True).FirstOrDefault(), DataGridView)
-            If dgv Is Nothing Then Return
+            If filteredHistory Is Nothing Then
+                Console.WriteLine("filteredHistory is Nothing")
+                Return
+            End If
 
-            dgv.DataSource = Nothing
-            dgv.DataSource = filteredHistory
+            Console.WriteLine($"Refreshing DataGridView with {filteredHistory.Count} records")
+
+            ' ใช้ BindingSource
+            Dim bindingSource As New BindingSource()
+            bindingSource.DataSource = filteredHistory
+            dgvHistory.DataSource = bindingSource
+
+            ' อัปเดตคอลัมน์สถานะ
+            For Each row As DataGridViewRow In dgvHistory.Rows
+                If row.DataBoundItem IsNot Nothing Then
+                    Dim record As ScanDataRecord = CType(row.DataBoundItem, ScanDataRecord)
+                    If dgvHistory.Columns.Contains("Status") Then
+                        row.Cells("Status").Value = If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")
+                        row.Cells("Status").Style.ForeColor = If(record.IsValid, Color.Green, Color.Red)
+                    End If
+                End If
+            Next
+
+            Console.WriteLine($"DataGridView refreshed. Row count: {dgvHistory.Rows.Count}")
 
         Catch ex As Exception
+            Console.WriteLine($"Error refreshing DataGridView: {ex.Message}")
             MessageBox.Show($"เกิดข้อผิดพลาดในการรีเฟรชข้อมูล: {ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
@@ -336,12 +244,125 @@
 
     Private Sub UpdateRecordCount()
         Try
-            Dim lblCount As Label = CType(Me.Controls.Find("lblCount", True).FirstOrDefault(), Label)
-            If lblCount IsNot Nothing Then
-                lblCount.Text = $"จำนวนรายการ: {filteredHistory.Count} จาก {scanHistory.Count} รายการทั้งหมด"
+            lblCount.Text = $"จำนวนรายการ: {If(filteredHistory?.Count, 0)} จาก {If(scanHistory?.Count, 0)} รายการทั้งหมด"
+            Console.WriteLine(lblCount.Text)
+        Catch ex As Exception
+            Console.WriteLine($"Error updating record count: {ex.Message}")
+        End Try
+    End Sub
+#End Region
+
+#Region "Event Handlers"
+    Private Sub dgvHistory_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
+        Try
+            Console.WriteLine($"DataBindingComplete fired. Rows: {dgvHistory.Rows.Count}")
+
+            If dgvHistory.Rows.Count = 0 Then
+                Console.WriteLine("No rows in DataGridView after binding")
+            Else
+                Console.WriteLine("DataGridView has data, updating status column...")
+                
+                ' อัปเดตคอลัมน์สถานะ
+                For Each row As DataGridViewRow In dgvHistory.Rows
+                    If row.DataBoundItem IsNot Nothing Then
+                        Dim record As ScanDataRecord = CType(row.DataBoundItem, ScanDataRecord)
+                        If dgvHistory.Columns.Contains("Status") Then
+                            row.Cells("Status").Value = If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")
+                            row.Cells("Status").Style.ForeColor = If(record.IsValid, Color.Green, Color.Red)
+                        End If
+                    End If
+                Next
             End If
-        Catch
-            ' ไม่ต้องทำอะไร
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in DataBindingComplete: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub dgvHistory_SelectionChanged(sender As Object, e As EventArgs)
+        Try
+            Dim hasSelection As Boolean = dgvHistory.SelectedRows.Count > 0
+            btnViewDetail.Enabled = hasSelection
+            btnDelete.Enabled = hasSelection
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in selection changed: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub dgvHistory_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs)
+        Try
+            ' เปลี่ยนสีแถวตามสถานะ
+            If e.RowIndex >= 0 AndAlso dgvHistory.Rows(e.RowIndex).DataBoundItem IsNot Nothing Then
+                Dim record As ScanDataRecord = CType(dgvHistory.Rows(e.RowIndex).DataBoundItem, ScanDataRecord)
+                If Not record.IsValid Then
+                    dgvHistory.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.FromArgb(255, 235, 235)
+                End If
+            End If
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in cell formatting: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub dgvHistory_DoubleClick(sender As Object, e As EventArgs)
+        btnViewDetail_Click(sender, e)
+    End Sub
+
+    Private Sub btnRefresh_Click(sender As Object, e As EventArgs)
+        RefreshData()
+    End Sub
+
+    Private Sub btnViewDetail_Click(sender As Object, e As EventArgs)
+        Try
+            If dgvHistory.SelectedRows.Count = 0 Then Return
+
+            Dim selectedRecord As ScanDataRecord = CType(dgvHistory.SelectedRows(0).DataBoundItem, ScanDataRecord)
+            ShowDetailDialog(selectedRecord)
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการแสดงรายละเอียด: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub btnDelete_Click(sender As Object, e As EventArgs)
+        Try
+            If dgvHistory.SelectedRows.Count = 0 Then Return
+
+            Dim result As DialogResult = MessageBox.Show(
+                "คุณต้องการลบรายการนี้หรือไม่?",
+                "ยืนยันการลบ",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question)
+
+            If result = DialogResult.Yes Then
+                MessageBox.Show("ฟีเจอร์การลบจะถูกเพิ่มในเวอร์ชันถัดไป", "แจ้งเตือน",
+                              MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการลบข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub btnExport_Click(sender As Object, e As EventArgs)
+        Try
+            ExportToCSV()
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการส่งออกข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub btnExportExcel_Click(sender As Object, e As EventArgs)
+        Try
+            MessageBox.Show("ฟีเจอร์ส่งออก Excel จะถูกเพิ่มในเวอร์ชันถัดไป", "แจ้งเตือน",
+                          MessageBoxButtons.OK, MessageBoxIcon.Information)
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาด: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
 #End Region
@@ -354,36 +375,29 @@
             filteredHistory = New List(Of ScanDataRecord)(scanHistory)
 
             ' กรองตามข้อความค้นหา
-            Dim txtSearch As TextBox = CType(Me.Controls.Find("txtSearch", True).FirstOrDefault(), TextBox)
-            If txtSearch IsNot Nothing AndAlso Not String.IsNullOrEmpty(txtSearch.Text) Then
+            If Not String.IsNullOrEmpty(txtSearch.Text) Then
                 Dim searchText As String = txtSearch.Text.ToLower()
                 filteredHistory = filteredHistory.Where(Function(x)
-                                                           Return x.ProductCode.ToLower().Contains(searchText) OrElse
+                                                            Return x.ProductCode.ToLower().Contains(searchText) OrElse
                                                                   x.ReferenceCode.ToLower().Contains(searchText) OrElse
                                                                   x.OriginalData.ToLower().Contains(searchText) OrElse
                                                                   x.ExtractedData.ToLower().Contains(searchText)
-                                                       End Function).ToList()
+                                                        End Function).ToList()
             End If
 
             ' กรองตามสถานะ
-            Dim cmbStatus As ComboBox = CType(Me.Controls.Find("cmbStatus", True).FirstOrDefault(), ComboBox)
-            If cmbStatus IsNot Nothing AndAlso cmbStatus.SelectedIndex > 0 Then
+            If cmbStatus.SelectedIndex > 0 Then
                 Dim isValid As Boolean = (cmbStatus.SelectedIndex = 1)
                 filteredHistory = filteredHistory.Where(Function(x) x.IsValid = isValid).ToList()
             End If
 
             ' กรองตามช่วงวันที่
-            Dim dtpFromDate As DateTimePicker = CType(Me.Controls.Find("dtpFromDate", True).FirstOrDefault(), DateTimePicker)
-            Dim dtpToDate As DateTimePicker = CType(Me.Controls.Find("dtpToDate", True).FirstOrDefault(), DateTimePicker)
-            
-            If dtpFromDate IsNot Nothing AndAlso dtpToDate IsNot Nothing Then
-                Dim fromDate As DateTime = dtpFromDate.Value.Date
-                Dim toDate As DateTime = dtpToDate.Value.Date.AddDays(1).AddSeconds(-1)
-                
-                filteredHistory = filteredHistory.Where(Function(x)
-                                                           Return x.ScanDateTime >= fromDate AndAlso x.ScanDateTime <= toDate
-                                                       End Function).ToList()
-            End If
+            Dim fromDate As DateTime = dtpFromDate.Value.Date
+            Dim toDate As DateTime = dtpToDate.Value.Date.AddDays(1).AddSeconds(-1)
+
+            filteredHistory = filteredHistory.Where(Function(x)
+                                                       Return x.ScanDateTime >= fromDate AndAlso x.ScanDateTime <= toDate
+                                                   End Function).ToList()
 
             RefreshDataGridView()
             UpdateRecordCount()
@@ -407,159 +421,7 @@
     End Sub
 #End Region
 
-#Region "Event Handlers"
-    Private Sub dgvHistory_SelectionChanged(sender As Object, e As EventArgs)
-        Try
-            Dim dgv As DataGridView = CType(sender, DataGridView)
-            Dim hasSelection As Boolean = dgv.SelectedRows.Count > 0
-
-            Dim btnViewDetail As Button = CType(Me.Controls.Find("btnViewDetail", True).FirstOrDefault(), Button)
-            Dim btnDelete As Button = CType(Me.Controls.Find("btnDelete", True).FirstOrDefault(), Button)
-
-            If btnViewDetail IsNot Nothing Then btnViewDetail.Enabled = hasSelection
-            If btnDelete IsNot Nothing Then btnDelete.Enabled = hasSelection
-
-        Catch
-            ' ไม่ต้องทำอะไร
-        End Try
-    End Sub
-
-    Private Sub dgvHistory_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs)
-        Try
-            Dim dgv As DataGridView = CType(sender, DataGridView)
-            
-            If e.ColumnIndex = dgv.Columns("StatusIcon").Index AndAlso e.RowIndex >= 0 Then
-                Dim record As ScanDataRecord = CType(dgv.Rows(e.RowIndex).DataBoundItem, ScanDataRecord)
-                
-                ' สร้างไอคอนสถานะ
-                Dim icon As Bitmap = CreateStatusIcon(record.IsValid)
-                e.Value = icon
-            End If
-
-            ' เปลี่ยนสีแถวตามสถานะ
-            If e.RowIndex >= 0 Then
-                Dim record As ScanDataRecord = CType(dgv.Rows(e.RowIndex).DataBoundItem, ScanDataRecord)
-                If Not record.IsValid Then
-                    dgv.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.FromArgb(255, 235, 235)
-                End If
-            End If
-
-        Catch
-            ' ไม่ต้องทำอะไร
-        End Try
-    End Sub
-
-    Private Sub dgvHistory_DoubleClick(sender As Object, e As EventArgs)
-        btnViewDetail_Click(sender, e)
-    End Sub
-
-    Private Sub btnRefresh_Click(sender As Object, e As EventArgs)
-        RefreshData()
-    End Sub
-
-    Private Sub btnViewDetail_Click(sender As Object, e As EventArgs)
-        Try
-            Dim dgv As DataGridView = CType(Me.Controls.Find("dgvHistory", True).FirstOrDefault(), DataGridView)
-            If dgv Is Nothing OrElse dgv.SelectedRows.Count = 0 Then Return
-
-            Dim selectedRecord As ScanDataRecord = CType(dgv.SelectedRows(0).DataBoundItem, ScanDataRecord)
-            ShowDetailDialog(selectedRecord)
-
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการแสดงรายละเอียด: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub btnDelete_Click(sender As Object, e As EventArgs)
-        Try
-            Dim dgv As DataGridView = CType(Me.Controls.Find("dgvHistory", True).FirstOrDefault(), DataGridView)
-            If dgv Is Nothing OrElse dgv.SelectedRows.Count = 0 Then Return
-
-            Dim result As DialogResult = MessageBox.Show(
-                "คุณต้องการลบรายการนี้หรือไม่?",
-                "ยืนยันการลบ",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question)
-
-            If result = DialogResult.Yes Then
-                ' TODO: เพิ่มฟังก์ชันลบข้อมูลในฐานข้อมูล
-                MessageBox.Show("ฟีเจอร์การลบจะถูกเพิ่มในเวอร์ชันถัดไป", "แจ้งเตือน",
-                              MessageBoxButtons.OK, MessageBoxIcon.Information)
-            End If
-
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการลบข้อมูล: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub btnExport_Click(sender As Object, e As EventArgs)
-        Try
-            ExportToCSV()
-        Catch ex As Exception
-            MessageBox.Show($"เกิดข้อผิดพลาดในการส่งออกข้อมูล: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
-
-    Private Sub frmHistory_Resize(sender As Object, e As EventArgs)
-        Try
-            ' ปรับขนาดปุ่มปิดให้อยู่มุมขวา
-            Dim btnClose As Button = CType(Me.Controls.Find("btnClose", True).FirstOrDefault(), Button)
-            If btnClose IsNot Nothing Then
-                btnClose.Location = New Point(Me.Width - 120, btnClose.Location.Y)
-            End If
-        Catch
-            ' ไม่ต้องทำอะไร
-        End Try
-    End Sub
-#End Region
-
 #Region "Utility Methods"
-    Private Function CreateStatusIcon(isValid As Boolean) As Bitmap
-        Try
-            Dim icon As New Bitmap(16, 16)
-            Using g As Graphics = Graphics.FromImage(icon)
-                g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
-                
-                If isValid Then
-                    ' สีเขียว สำหรับสถานะถูกต้อง
-                    Using brush As New SolidBrush(Color.FromArgb(46, 125, 50))
-                        g.FillEllipse(brush, 2, 2, 12, 12)
-                    End Using
-                    
-                    ' เครื่องหมายถูก
-                    Using pen As New Pen(Color.White, 2)
-                        g.DrawLines(pen, {New Point(5, 8), New Point(7, 10), New Point(11, 6)})
-                    End Using
-                Else
-                    ' สีแดง สำหรับสถานะไม่ถูกต้อง
-                    Using brush As New SolidBrush(Color.FromArgb(211, 47, 47))
-                        g.FillEllipse(brush, 2, 2, 12, 12)
-                    End Using
-                    
-                    ' เครื่องหมาย X
-                    Using pen As New Pen(Color.White, 2)
-                        g.DrawLine(pen, 5, 5, 11, 11)
-                        g.DrawLine(pen, 11, 5, 5, 11)
-                    End Using
-                End If
-            End Using
-            
-            Return icon
-            
-        Catch
-            ' Return simple colored square if graphics creation fails
-            Dim fallback As New Bitmap(16, 16)
-            Using g As Graphics = Graphics.FromImage(fallback)
-                Dim color As Color = If(isValid, Color.Green, Color.Red)
-                g.Clear(color)
-            End Using
-            Return fallback
-        End Try
-    End Function
-
     Private Sub ShowDetailDialog(record As ScanDataRecord)
         Try
             Dim detailForm As New Form() With {
@@ -568,7 +430,8 @@
                 .StartPosition = FormStartPosition.CenterParent,
                 .FormBorderStyle = FormBorderStyle.FixedDialog,
                 .MaximizeBox = False,
-                .MinimizeBox = False
+                .MinimizeBox = False,
+                .Font = New Font("Segoe UI", 9)
             }
 
             ' สร้าง TextBox แสดงรายละเอียด
@@ -597,25 +460,25 @@
             details.AppendLine($"เครื่องที่สแกน: {record.ComputerName}")
             details.AppendLine($"ผู้ใช้: {record.UserName}")
             details.AppendLine()
-            
+
             If Not String.IsNullOrEmpty(record.ValidationMessages) Then
                 details.AppendLine("ข้อความเตือน:")
                 details.AppendLine(record.ValidationMessages)
                 details.AppendLine()
             End If
-            
+
             details.AppendLine("ข้อมูลต้นฉบับ:")
             details.AppendLine(record.OriginalData)
 
             txtDetail.Text = details.ToString()
 
             ' เพิ่ม panel สำหรับปุ่ม
-            Dim pnlButtons As New Panel() With {
+            Dim pnlDetailButtons As New Panel() With {
                 .Height = 50,
                 .Dock = DockStyle.Bottom
             }
 
-            Dim btnClose As New Button() With {
+            Dim btnDetailClose As New Button() With {
                 .Text = "ปิด",
                 .Size = New Size(75, 30),
                 .Location = New Point(detailForm.Width - 95, 10),
@@ -623,8 +486,8 @@
                 .DialogResult = DialogResult.OK
             }
 
-            pnlButtons.Controls.Add(btnClose)
-            detailForm.Controls.Add(pnlButtons)
+            pnlDetailButtons.Controls.Add(btnDetailClose)
+            detailForm.Controls.Add(pnlDetailButtons)
             detailForm.Controls.Add(txtDetail)
 
             detailForm.ShowDialog()
@@ -667,4 +530,838 @@
     End Sub
 #End Region
 
-End Class
+End ClassHeaderText = "ผู้ใช้",
+                .DataPropertyName = "UserName",
+                .Width = 100
+            }
+            dgvHistory.Columns.Add(colUserName)
+
+            Console.WriteLine("DataGridView setup completed with " & dgvHistory.Columns.Count & " columns")
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการตั้งค่า DataGridView: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+#End Region
+
+#Region "Data Management"
+    Private Sub LoadScanHistory()
+        Try
+            Console.WriteLine("Loading scan history...")
+
+            ' ตรวจสอบการเชื่อมต่อฐานข้อมูล
+            If Not DatabaseManager.IsConnected Then
+                Console.WriteLine("Database not connected, attempting to initialize...")
+                If Not DatabaseManager.Initialize() Then
+                    MessageBox.Show("ไม่สามารถเชื่อมต่อฐานข้อมูลได้", "ข้อผิดพลาด")
+                    CreateTestData()
+                    Return
+                End If
+            End If
+
+            scanHistory = DatabaseManager.GetScanHistory(1000)
+            Console.WriteLine($"Loaded {scanHistory.Count} records from database")
+
+            ' ถ้าไม่มีข้อมูลจากฐานข้อมูล ให้สร้างข้อมูลทดสอบ
+            If scanHistory.Count = 0 Then
+                CreateTestData()
+            End If
+
+            filteredHistory = New List(Of ScanDataRecord)(scanHistory)
+            RefreshDataGridView()
+            UpdateRecordCount()
+
+        Catch ex As Exception
+            Console.WriteLine($"Error loading data: {ex.Message}")
+            MessageBox.Show($"เกิดข้อผิดพลาดในการโหลดข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            CreateTestData()
+        End Try
+    End Sub
+
+    Private Sub CreateTestData()
+        Try
+            Console.WriteLine("Creating test data...")
+            scanHistory = New List(Of ScanDataRecord)()
+
+            ' สร้างข้อมูลทดสอบ 15 รายการ
+            For i As Integer = 1 To 15
+                Dim testRecord As New ScanDataRecord() With {
+                    .ScanDateTime = DateTime.Now.AddHours(-i),
+                    .OriginalData = $"R00C-19160425501276{i}+Q000060+P20414-00770{i}A000+D20250527+LPT0000000+V00C-191604+U0000000",
+                    .ExtractedData = $"20414-00770{i}A000",
+                    .ProductCode = $"20414-00770{i}A000",
+                    .ReferenceCode = $"00C-19160425501276{i}",
+                    .Quantity = "60",
+                    .DateCode = "20250527",
+                    .IsValid = (i Mod 3 <> 0),
+                    .ValidationMessages = If(i Mod 3 = 0, "ข้อมูลไม่สมบูรณ์", ""),
+                    .ComputerName = Environment.MachineName,
+                    .UserName = Environment.UserName
+                }
+                scanHistory.Add(testRecord)
+            Next
+
+            filteredHistory = New List(Of ScanDataRecord)(scanHistory)
+            RefreshDataGridView()
+            UpdateRecordCount()
+
+            Console.WriteLine($"Created {scanHistory.Count} test records")
+
+        Catch ex As Exception
+            Console.WriteLine($"Error creating test data: {ex.Message}")
+            MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างข้อมูลทดสอบ: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub RefreshDataGridView()
+        Try
+            If filteredHistory Is Nothing Then
+                Console.WriteLine("filteredHistory is Nothing")
+                Return
+            End If
+
+            Console.WriteLine($"Refreshing DataGridView with {filteredHistory.Count} records")
+
+            ' ใช้ BindingSource
+            Dim bindingSource As New BindingSource()
+            bindingSource.DataSource = filteredHistory
+            dgvHistory.DataSource = bindingSource
+
+            ' อัปเดตคอลัมน์สถานะ
+            For Each row As DataGridViewRow In dgvHistory.Rows
+                If row.DataBoundItem IsNot Nothing Then
+                    Dim record As ScanDataRecord = CType(row.DataBoundItem, ScanDataRecord)
+                    If dgvHistory.Columns.Contains("Status") Then
+                        row.Cells("Status").Value = If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")
+                        row.Cells("Status").Style.ForeColor = If(record.IsValid, Color.Green, Color.Red)
+                    End If
+                End If
+            Next
+
+            Console.WriteLine($"DataGridView refreshed. Row count: {dgvHistory.Rows.Count}")
+
+        Catch ex As Exception
+            Console.WriteLine($"Error refreshing DataGridView: {ex.Message}")
+            MessageBox.Show($"เกิดข้อผิดพลาดในการรีเฟรชข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub RefreshData()
+        LoadScanHistory()
+    End Sub
+
+    Private Sub UpdateRecordCount()
+        Try
+            lblCount.Text = $"จำนวนรายการ: {If(filteredHistory?.Count, 0)} จาก {If(scanHistory?.Count, 0)} รายการทั้งหมด"
+            Console.WriteLine(lblCount.Text)
+        Catch ex As Exception
+            Console.WriteLine($"Error updating record count: {ex.Message}")
+        End Try
+    End Sub
+#End Region
+
+#Region "Event Handlers"
+    Private Sub dgvHistory_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
+        Try
+            Console.WriteLine($"DataBindingComplete fired. Rows: {dgvHistory.Rows.Count}")
+
+            If dgvHistory.Rows.Count = 0 Then
+                Console.WriteLine("No rows in DataGridView after binding")
+            Else
+                Console.WriteLine("DataGridView has data, updating status column...")
+                
+                ' อัปเดตคอลัมน์สถานะ
+                For Each row As DataGridViewRow In dgvHistory.Rows
+                    If row.DataBoundItem IsNot Nothing Then
+                        Dim record As ScanDataRecord = CType(row.DataBoundItem, ScanDataRecord)
+                        If dgvHistory.Columns.Contains("Status") Then
+                            row.Cells("Status").Value = If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")
+                            row.Cells("Status").Style.ForeColor = If(record.IsValid, Color.Green, Color.Red)
+                        End If
+                    End If
+                Next
+            End If
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in DataBindingComplete: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub dgvHistory_SelectionChanged(sender As Object, e As EventArgs)
+        Try
+            Dim hasSelection As Boolean = dgvHistory.SelectedRows.Count > 0
+            btnViewDetail.Enabled = hasSelection
+            btnDelete.Enabled = hasSelection
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in selection changed: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub dgvHistory_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs)
+        Try
+            ' เปลี่ยนสีแถวตามสถานะ
+            If e.RowIndex >= 0 AndAlso dgvHistory.Rows(e.RowIndex).DataBoundItem IsNot Nothing Then
+                Dim record As ScanDataRecord = CType(dgvHistory.Rows(e.RowIndex).DataBoundItem, ScanDataRecord)
+                If Not record.IsValid Then
+                    dgvHistory.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.FromArgb(255, 235, 235)
+                End If
+            End If
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in cell formatting: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub dgvHistory_DoubleClick(sender As Object, e As EventArgs)
+        btnViewDetail_Click(sender, e)
+    End Sub
+
+    Private Sub btnRefresh_Click(sender As Object, e As EventArgs)
+        RefreshData()
+    End Sub
+
+    Private Sub btnViewDetail_Click(sender As Object, e As EventArgs)
+        Try
+            If dgvHistory.SelectedRows.Count = 0 Then Return
+
+            Dim selectedRecord As ScanDataRecord = CType(dgvHistory.SelectedRows(0).DataBoundItem, ScanDataRecord)
+            ShowDetailDialog(selectedRecord)
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการแสดงรายละเอียด: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub btnDelete_Click(sender As Object, e As EventArgs)
+        Try
+            If dgvHistory.SelectedRows.Count = 0 Then Return
+
+            Dim result As DialogResult = MessageBox.Show(
+                "คุณต้องการลบรายการนี้หรือไม่?",
+                "ยืนยันการลบ",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question)
+
+            If result = DialogResult.Yes Then
+                MessageBox.Show("ฟีเจอร์การลบจะถูกเพิ่มในเวอร์ชันถัดไป", "แจ้งเตือน",
+                              MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการลบข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub btnExport_Click(sender As Object, e As EventArgs)
+        Try
+            ExportToCSV()
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการส่งออกข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub btnExportExcel_Click(sender As Object, e As EventArgs)
+        Try
+            MessageBox.Show("ฟีเจอร์ส่งออก Excel จะถูกเพิ่มในเวอร์ชันถัดไป", "แจ้งเตือน",
+                          MessageBoxButtons.OK, MessageBoxIcon.Information)
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาด: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+#End Region
+
+#Region "Filter and Search"
+    Private Sub ApplyFilters()
+        Try
+            If scanHistory Is Nothing Then Return
+
+            filteredHistory = New List(Of ScanDataRecord)(scanHistory)
+
+            ' กรองตามข้อความค้นหา
+            If Not String.IsNullOrEmpty(txtSearch.Text) Then
+                Dim searchText As String = txtSearch.Text.ToLower()
+                filteredHistory = filteredHistory.Where(Function(x)
+                                                            Return x.ProductCode.ToLower().Contains(searchText) OrElse
+                                                                  x.ReferenceCode.ToLower().Contains(searchText) OrElse
+                                                                  x.OriginalData.ToLower().Contains(searchText) OrElse
+                                                                  x.ExtractedData.ToLower().Contains(searchText)
+                                                        End Function).ToList()
+            End If
+
+            ' กรองตามสถานะ
+            If cmbStatus.SelectedIndex > 0 Then
+                Dim isValid As Boolean = (cmbStatus.SelectedIndex = 1)
+                filteredHistory = filteredHistory.Where(Function(x) x.IsValid = isValid).ToList()
+            End If
+
+            ' กรองตามช่วงวันที่
+            Dim fromDate As DateTime = dtpFromDate.Value.Date
+            Dim toDate As DateTime = dtpToDate.Value.Date.AddDays(1).AddSeconds(-1)
+
+            filteredHistory = filteredHistory.Where(Function(x)
+                                                       Return x.ScanDateTime >= fromDate AndAlso x.ScanDateTime <= toDate
+                                                   End Function).ToList()
+
+            RefreshDataGridView()
+            UpdateRecordCount()
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการกรองข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub txtSearch_TextChanged(sender As Object, e As EventArgs)
+        ApplyFilters()
+    End Sub
+
+    Private Sub cmbStatus_SelectedIndexChanged(sender As Object, e As EventArgs)
+        ApplyFilters()
+    End Sub
+
+    Private Sub DateFilter_Changed(sender As Object, e As EventArgs)
+        ApplyFilters()
+    End Sub
+#End Region
+
+#Region "Utility Methods"
+    Private Sub ShowDetailDialog(record As ScanDataRecord)
+        Try
+            Dim detailForm As New Form() With {
+                .Text = "รายละเอียดการสแกน",
+                .Size = New Size(600, 500),
+                .StartPosition = FormStartPosition.CenterParent,
+                .FormBorderStyle = FormBorderStyle.FixedDialog,
+                .MaximizeBox = False,
+                .MinimizeBox = False,
+                .Font = New Font("Segoe UI", 9)
+            }
+
+            ' สร้าง TextBox แสดงรายละเอียด
+            Dim txtDetail As New TextBox() With {
+                .Multiline = True,
+                .ScrollBars = ScrollBars.Vertical,
+                .ReadOnly = True,
+                .Dock = DockStyle.Fill,
+                .Font = New Font("Consolas", 10),
+                .Margin = New Padding(10)
+            }
+
+            ' สร้างข้อความรายละเอียด
+            Dim details As New System.Text.StringBuilder()
+            details.AppendLine("=== รายละเอียดการสแกน QR Code ===")
+            details.AppendLine()
+            details.AppendLine($"วันที่/เวลา: {record.ScanDateTime:dd/MM/yyyy HH:mm:ss}")
+            details.AppendLine($"สถานะ: {If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")}")
+            details.AppendLine()
+            details.AppendLine("ข้อมูลที่ดึงออกมา:")
+            details.AppendLine($"  รหัสผลิตภัณฑ์: {record.ProductCode}")
+            details.AppendLine($"  รหัสอ้างอิง: {record.ReferenceCode}")
+            details.AppendLine($"  จำนวน: {record.Quantity}")
+            details.AppendLine($"  วันที่ผลิต: {record.DateCode}")
+            details.AppendLine()
+            details.AppendLine($"เครื่องที่สแกน: {record.ComputerName}")
+            details.AppendLine($"ผู้ใช้: {record.UserName}")
+            details.AppendLine()
+
+            If Not String.IsNullOrEmpty(record.ValidationMessages) Then
+                details.AppendLine("ข้อความเตือน:")
+                details.AppendLine(record.ValidationMessages)
+                details.AppendLine()
+            End If
+
+            details.AppendLine("ข้อมูลต้นฉบับ:")
+            details.AppendLine(record.OriginalData)
+
+            txtDetail.Text = details.ToString()
+
+            ' เพิ่ม panel สำหรับปุ่ม
+            Dim pnlDetailButtons As New Panel() With {
+                .Height = 50,
+                .Dock = DockStyle.Bottom
+            }
+
+            Dim btnDetailClose As New Button() With {
+                .Text = "ปิด",
+                .Size = New Size(75, 30),
+                .Location = New Point(detailForm.Width - 95, 10),
+                .Anchor = AnchorStyles.Top Or AnchorStyles.Right,
+                .DialogResult = DialogResult.OK
+            }
+
+            pnlDetailButtons.Controls.Add(btnDetailClose)
+            detailForm.Controls.Add(pnlDetailButtons)
+            detailForm.Controls.Add(txtDetail)
+
+            detailForm.ShowDialog()
+            detailForm.Dispose()
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการแสดงรายละเอียด: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub ExportToCSV()
+        Try
+            Dim saveDialog As New SaveFileDialog() With {
+                .Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*",
+                .Title = "ส่งออกข้อมูลเป็น CSV",
+                .FileName = $"ScanHistory_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            }
+
+            If saveDialog.ShowDialog() = DialogResult.OK Then
+                Using writer As New IO.StreamWriter(saveDialog.FileName, False, System.Text.Encoding.UTF8)
+                    ' เขียน header
+                    writer.WriteLine("วันที่/เวลา,รหัสผลิตภัณฑ์,รหัสอ้างอิง,จำนวน,วันที่ผลิต,สถานะ,เครื่อง,ผู้ใช้,ข้อมูลต้นฉบับ")
+
+                    ' เขียนข้อมูล
+                    For Each record As ScanDataRecord In filteredHistory
+                        Dim line As String = $"""{record.ScanDateTime:dd/MM/yyyy HH:mm:ss}"",""{record.ProductCode}"",""{record.ReferenceCode}"",""{record.Quantity}"",""{record.DateCode}"",""{If(record.IsValid, "ถูกต้อง", "ไม่ถูกต้อง")}"",""{record.ComputerName}"",""{record.UserName}"",""{record.OriginalData.Replace("""", """""")}"""
+                        writer.WriteLine(line)
+                    Next
+                End Using
+
+                MessageBox.Show($"ส่งออกข้อมูลเรียบร้อยแล้ว" & vbNewLine & $"ไฟล์: {saveDialog.FileName}",
+                              "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการส่งออกข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+#End Region
+
+End ClassHeaderText = "ผู้ใช้",
+                .DataPropertyName = "UserName",
+                .Width = 100
+            }
+            dgvHistory.Columns.Add(colUserName)
+
+            Console.WriteLine($"Created {scanHistory.Count} test records")
+
+        Catch ex As Exception
+            Console.WriteLine($"Error creating test data: {ex.Message}")
+            MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างข้อมูลทดสอบ: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub RefreshDataGridView()
+        Try
+            If filteredHistory Is Nothing Then
+                Console.WriteLine("filteredHistory is Nothing")
+                Return
+            End If
+
+            Console.WriteLine($"Refreshing DataGridView with {filteredHistory.Count} records")
+
+            ' ใช้ BindingSource
+            Dim bindingSource As New BindingSource()
+            bindingSource.DataSource = filteredHistory
+            dgvHistory.DataSource = bindingSource
+
+            ' อัปเดตคอลัมน์สถานะ
+            For Each row As DataGridViewRow In dgvHistory.Rows
+                If row.DataBoundItem IsNot Nothing Then
+                    Dim record As ScanDataRecord = CType(row.DataBoundItem, ScanDataRecord)
+                    If dgvHistory.Columns.Contains("Status") Then
+                        row.Cells("Status").Value = If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")
+                        row.Cells("Status").Style.ForeColor = If(record.IsValid, Color.Green, Color.Red)
+                    End If
+                End If
+            Next
+
+            Console.WriteLine($"DataGridView refreshed. Row count: {dgvHistory.Rows.Count}")
+
+        Catch ex As Exception
+            Console.WriteLine($"Error refreshing DataGridView: {ex.Message}")
+            MessageBox.Show($"เกิดข้อผิดพลาดในการรีเฟรชข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub RefreshData()
+        LoadScanHistory()
+    End Sub
+
+    Private Sub UpdateRecordCount()
+        Try
+            lblCount.Text = $"จำนวนรายการ: {If(filteredHistory?.Count, 0)} จาก {If(scanHistory?.Count, 0)} รายการทั้งหมด"
+            Console.WriteLine(lblCount.Text)
+        Catch ex As Exception
+            Console.WriteLine($"Error updating record count: {ex.Message}")
+        End Try
+    End Sub
+#End Region
+
+#Region "Event Handlers"
+    Private Sub dgvHistory_DataBindingComplete(sender As Object, e As DataGridViewBindingCompleteEventArgs)
+        Try
+            Console.WriteLine($"DataBindingComplete fired. Rows: {dgvHistory.Rows.Count}")
+
+            If dgvHistory.Rows.Count = 0 Then
+                Console.WriteLine("No rows in DataGridView after binding")
+            Else
+                Console.WriteLine("DataGridView has data, updating status column...")
+
+                ' อัปเดตคอลัมน์สถานะ
+                For Each row As DataGridViewRow In dgvHistory.Rows
+                    If row.DataBoundItem IsNot Nothing Then
+                        Dim record As ScanDataRecord = CType(row.DataBoundItem, ScanDataRecord)
+                        If dgvHistory.Columns.Contains("Status") Then
+                            row.Cells("Status").Value = If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")
+                            row.Cells("Status").Style.ForeColor = If(record.IsValid, Color.Green, Color.Red)
+                        End If
+                    End If
+                Next
+            End If
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in DataBindingComplete: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub dgvHistory_SelectionChanged(sender As Object, e As EventArgs)
+        Try
+            Dim hasSelection As Boolean = dgvHistory.SelectedRows.Count > 0
+            btnViewDetail.Enabled = hasSelection
+            btnDelete.Enabled = hasSelection
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in selection changed: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub dgvHistory_CellFormatting(sender As Object, e As DataGridViewCellFormattingEventArgs)
+        Try
+            ' เปลี่ยนสีแถวตามสถานะ
+            If e.RowIndex >= 0 AndAlso dgvHistory.Rows(e.RowIndex).DataBoundItem IsNot Nothing Then
+                Dim record As ScanDataRecord = CType(dgvHistory.Rows(e.RowIndex).DataBoundItem, ScanDataRecord)
+                If Not record.IsValid Then
+                    dgvHistory.Rows(e.RowIndex).DefaultCellStyle.BackColor = Color.FromArgb(255, 235, 235)
+                End If
+            End If
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in cell formatting: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub dgvHistory_DoubleClick(sender As Object, e As EventArgs)
+        btnViewDetail_Click(sender, e)
+    End Sub
+
+    Private Sub btnRefresh_Click(sender As Object, e As EventArgs)
+        RefreshData()
+    End Sub
+
+    Private Sub btnViewDetail_Click(sender As Object, e As EventArgs)
+        Try
+            If dgvHistory.SelectedRows.Count = 0 Then Return
+
+            Dim selectedRecord As ScanDataRecord = CType(dgvHistory.SelectedRows(0).DataBoundItem, ScanDataRecord)
+            ShowDetailDialog(selectedRecord)
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการแสดงรายละเอียด: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub btnDelete_Click(sender As Object, e As EventArgs)
+        Try
+            If dgvHistory.SelectedRows.Count = 0 Then Return
+
+            Dim result As DialogResult = MessageBox.Show(
+                "คุณต้องการลบรายการนี้หรือไม่?",
+                "ยืนยันการลบ",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question)
+
+            If result = DialogResult.Yes Then
+                MessageBox.Show("ฟีเจอร์การลบจะถูกเพิ่มในเวอร์ชันถัดไป", "แจ้งเตือน",
+                              MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการลบข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub btnExport_Click(sender As Object, e As EventArgs)
+        Try
+            ExportToCSV()
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการส่งออกข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub btnExportExcel_Click(sender As Object, e As EventArgs)
+        Try
+            MessageBox.Show("ฟีเจอร์ส่งออก Excel จะถูกเพิ่มในเวอร์ชันถัดไป", "แจ้งเตือน",
+                          MessageBoxButtons.OK, MessageBoxIcon.Information)
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาด: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+#End Region
+
+#Region "Filter and Search"
+    Private Sub ApplyFilters()
+        Try
+            If scanHistory Is Nothing Then Return
+
+            filteredHistory = New List(Of ScanDataRecord)(scanHistory)
+
+            ' กรองตามข้อความค้นหา
+            If Not String.IsNullOrEmpty(txtSearch.Text) Then
+                Dim searchText As String = txtSearch.Text.ToLower()
+                filteredHistory = filteredHistory.Where(Function(x)
+                                                            Return x.ProductCode.ToLower().Contains(searchText) OrElse
+                                                                  x.ReferenceCode.ToLower().Contains(searchText) OrElse
+                                                                  x.OriginalData.ToLower().Contains(searchText) OrElse
+                                                                  x.ExtractedData.ToLower().Contains(searchText)
+                                                        End Function).ToList()
+            End If
+
+            ' กรองตามสถานะ
+            If cmbStatus.SelectedIndex > 0 Then
+                Dim isValid As Boolean = (cmbStatus.SelectedIndex = 1)
+                filteredHistory = filteredHistory.Where(Function(x) x.IsValid = isValid).ToList()
+            End If
+
+            ' กรองตามช่วงวันที่
+            Dim fromDate As DateTime = dtpFromDate.Value.Date
+            Dim toDate As DateTime = dtpToDate.Value.Date.AddDays(1).AddSeconds(-1)
+
+            filteredHistory = filteredHistory.Where(Function(x)
+                                                       Return x.ScanDateTime >= fromDate AndAlso x.ScanDateTime <= toDate
+                                                   End Function).ToList()
+
+            RefreshDataGridView()
+            UpdateRecordCount()
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการกรองข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub txtSearch_TextChanged(sender As Object, e As EventArgs)
+        ApplyFilters()
+    End Sub
+
+    Private Sub cmbStatus_SelectedIndexChanged(sender As Object, e As EventArgs)
+        ApplyFilters()
+    End Sub
+
+    Private Sub DateFilter_Changed(sender As Object, e As EventArgs)
+        ApplyFilters()
+    End Sub
+#End Region
+
+#Region "Utility Methods"
+    Private Sub ShowDetailDialog(record As ScanDataRecord)
+        Try
+            Dim detailForm As New Form() With {
+                .Text = "รายละเอียดการสแกน",
+                .Size = New Size(600, 500),
+                .StartPosition = FormStartPosition.CenterParent,
+                .FormBorderStyle = FormBorderStyle.FixedDialog,
+                .MaximizeBox = False,
+                .MinimizeBox = False
+            }
+
+            ' สร้าง TextBox แสดงรายละเอียด
+            Dim txtDetail As New TextBox() With {
+                .Multiline = True,
+                .ScrollBars = ScrollBars.Vertical,
+                .ReadOnly = True,
+                .Dock = DockStyle.Fill,
+                .Font = New Font("Consolas", 10),
+                .Margin = New Padding(10)
+            }
+
+            ' สร้างข้อความรายละเอียด
+            Dim details As New System.Text.StringBuilder()
+            details.AppendLine("=== รายละเอียดการสแกน QR Code ===")
+            details.AppendLine()
+            details.AppendLine($"วันที่/เวลา: {record.ScanDateTime:dd/MM/yyyy HH:mm:ss}")
+            details.AppendLine($"สถานะ: {If(record.IsValid, "✅ ถูกต้อง", "❌ ไม่ถูกต้อง")}")
+            details.AppendLine()
+            details.AppendLine("ข้อมูลที่ดึงออกมา:")
+            details.AppendLine($"  รหัสผลิตภัณฑ์: {record.ProductCode}")
+            details.AppendLine($"  รหัสอ้างอิง: {record.ReferenceCode}")
+            details.AppendLine($"  จำนวน: {record.Quantity}")
+            details.AppendLine($"  วันที่ผลิต: {record.DateCode}")
+            details.AppendLine()
+            details.AppendLine($"เครื่องที่สแกน: {record.ComputerName}")
+            details.AppendLine($"ผู้ใช้: {record.UserName}")
+            details.AppendLine()
+
+            If Not String.IsNullOrEmpty(record.ValidationMessages) Then
+                details.AppendLine("ข้อความเตือน:")
+                details.AppendLine(record.ValidationMessages)
+                details.AppendLine()
+            End If
+
+            details.AppendLine("ข้อมูลต้นฉบับ:")
+            details.AppendLine(record.OriginalData)
+
+            txtDetail.Text = details.ToString()
+
+            ' เพิ่ม panel สำหรับปุ่ม
+            Dim pnlDetailButtons As New Panel() With {
+                .Height = 50,
+                .Dock = DockStyle.Bottom
+            }
+
+            Dim btnDetailClose As New Button() With {
+                .Text = "ปิด",
+                .Size = New Size(75, 30),
+                .Location = New Point(detailForm.Width - 95, 10),
+                .Anchor = AnchorStyles.Top Or AnchorStyles.Right,
+                .DialogResult = DialogResult.OK
+            }
+
+            pnlDetailButtons.Controls.Add(btnDetailClose)
+            detailForm.Controls.Add(pnlDetailButtons)
+            detailForm.Controls.Add(txtDetail)
+
+            detailForm.ShowDialog()
+            detailForm.Dispose()
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการแสดงรายละเอียด: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
+    Private Sub ExportToCSV()
+        Try
+            Dim saveDialog As New SaveFileDialog() With {
+                .Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*",
+                .Title = "ส่งออกข้อมูลเป็น CSV",
+                .FileName = $"ScanHistory_{DateTime.Now:yyyyMMdd_HHmmss}.csv"
+            }
+
+            If saveDialog.ShowDialog() = DialogResult.OK Then
+                Using writer As New IO.StreamWriter(saveDialog.FileName, False, System.Text.Encoding.UTF8)
+                    ' เขียน header
+                    writer.WriteLine("วันที่/เวลา,รหัสผลิตภัณฑ์,รหัสอ้างอิง,จำนวน,วันที่ผลิต,สถานะ,เครื่อง,ผู้ใช้,ข้อมูลต้นฉบับ")
+
+                    ' เขียนข้อมูล
+                    For Each record As ScanDataRecord In filteredHistory
+                        Dim line As String = $"""{record.ScanDateTime:dd/MM/yyyy HH:mm:ss}"",""{record.ProductCode}"",""{record.ReferenceCode}"",""{record.Quantity}"",""{record.DateCode}"",""{If(record.IsValid, "ถูกต้อง", "ไม่ถูกต้อง")}"",""{record.ComputerName}"",""{record.UserName}"",""{record.OriginalData.Replace("""", """""")}"""
+                        writer.WriteLine(line)
+                    Next
+                End Using
+
+                MessageBox.Show($"ส่งออกข้อมูลเรียบร้อยแล้ว" & vbNewLine & $"ไฟล์: {saveDialog.FileName}",
+                              "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการส่งออกข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+#End Region
+
+End Class.WriteLine("DataGridView setup completed with " & dgvHistory.Columns.Count & " columns")
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการตั้งค่า DataGridView: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+#End Region
+
+#Region "Data Management"
+    Private Sub LoadScanHistory()
+        Try
+            Console.WriteLine("Loading scan history...")
+
+            ' ตรวจสอบการเชื่อมต่อฐานข้อมูล
+            If Not DatabaseManager.IsConnected Then
+                Console.WriteLine("Database not connected, attempting to initialize...")
+                If Not DatabaseManager.Initialize() Then
+                    MessageBox.Show("ไม่สามารถเชื่อมต่อฐานข้อมูลได้", "ข้อผิดพลาด")
+                    ' สร้างข้อมูลทดสอบ
+                    CreateTestData()
+                    Return
+                End If
+            End If
+
+            scanHistory = DatabaseManager.GetScanHistory(1000)
+            Console.WriteLine($"Loaded {scanHistory.Count} records from database")
+
+            ' ถ้าไม่มีข้อมูลจากฐานข้อมูล ให้สร้างข้อมูลทดสอบ
+            If scanHistory.Count = 0 Then
+                CreateTestData()
+            End If
+
+            filteredHistory = New List(Of ScanDataRecord)(scanHistory)
+            RefreshDataGridView()
+            UpdateRecordCount()
+
+        Catch ex As Exception
+            Console.WriteLine($"Error loading data: {ex.Message}")
+            MessageBox.Show($"เกิดข้อผิดพลาดในการโหลดข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            ' สร้างข้อมูลทดสอบในกรณีมีปัญหา
+            CreateTestData()
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' สร้างข้อมูลทดสอบเมื่อไม่มีข้อมูลจากฐานข้อมูล
+    ''' </summary>
+    Private Sub CreateTestData()
+        Try
+            Console.WriteLine("Creating test data...")
+            scanHistory = New List(Of ScanDataRecord)()
+
+            ' สร้างข้อมูลทดสอบ 10 รายการ
+            For i As Integer = 1 To 10
+                Dim testRecord As New ScanDataRecord() With {
+                    .ScanDateTime = DateTime.Now.AddHours(-i),
+                    .OriginalData = $"R00C-19160425501276{i}+Q000060+P20414-00770{i}A000+D20250527+LPT0000000+V00C-191604+U0000000",
+                    .ExtractedData = $"20414-00770{i}A000",
+                    .ProductCode = $"20414-00770{i}A000",
+                    .ReferenceCode = $"00C-19160425501276{i}",
+                    .Quantity = "60",
+                    .DateCode = "20250527",
+                    .IsValid = (i Mod 3 <> 0), ' สลับสถานะ
+                    .ValidationMessages = If(i Mod 3 = 0, "ข้อมูลไม่สมบูรณ์", ""),
+                    .ComputerName = Environment.MachineName,
+                    .UserName = Environment.UserName
+                }
+                scanHistory.Add(testRecord)
+            Next
+
+            filteredHistory = New List(Of ScanDataRecord)(scanHistory)
+            RefreshDataGridView()
+            UpdateRecordCount()
+
+            Console.WriteLine("Test data created successfully")
+            MessageBox.Show("สร้างข้อมูลทดสอบเรียบร้อยแล้ว", "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        Catch ex As Exception
+            Console.WriteLine($"Error creating test data: {ex.Message}")
+            MessageBox.Show($"เกิดข้อผิดพลาดในการสร้างข้อมูลทดสอบ: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+#End Region
