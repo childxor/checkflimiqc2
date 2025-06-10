@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "dgSpecHash": "wHhgu8ugFOs=",
+  "dgSpecHash": "ahLpvktZ7wI=",
   "success": true,
   "projectFilePath": "C:\\Users\\adisaks\\source\\repos\\CheckFlimIQC2\\CheckFlimIQC2\\CheckFlimIQC2.vbproj",
   "expectedPackageFiles": [
@@ -24,6 +24,7 @@
     "C:\\Users\\adisaks\\.nuget\\packages\\microsoft.identitymodel.protocols\\7.5.0\\microsoft.identitymodel.protocols.7.5.0.nupkg.sha512",
     "C:\\Users\\adisaks\\.nuget\\packages\\microsoft.identitymodel.protocols.openidconnect\\7.5.0\\microsoft.identitymodel.protocols.openidconnect.7.5.0.nupkg.sha512",
     "C:\\Users\\adisaks\\.nuget\\packages\\microsoft.identitymodel.tokens\\7.5.0\\microsoft.identitymodel.tokens.7.5.0.nupkg.sha512",
+    "C:\\Users\\adisaks\\.nuget\\packages\\microsoft.office.interop.excel\\15.0.4795.1001\\microsoft.office.interop.excel.15.0.4795.1001.nupkg.sha512",
     "C:\\Users\\adisaks\\.nuget\\packages\\microsoft.sqlserver.server\\1.0.0\\microsoft.sqlserver.server.1.0.0.nupkg.sha512",
     "C:\\Users\\adisaks\\.nuget\\packages\\runtime.native.system.data.sqlclient.sni\\4.4.0\\runtime.native.system.data.sqlclient.sni.4.4.0.nupkg.sha512",
     "C:\\Users\\adisaks\\.nuget\\packages\\runtime.win-arm64.runtime.native.system.data.sqlclient.sni\\4.4.0\\runtime.win-arm64.runtime.native.system.data.sqlclient.sni.4.4.0.nupkg.sha512",

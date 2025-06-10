@@ -1,0 +1,5 @@
+2025-06-10 13:49:11 - Error creating database tables: Timeout expired.  The timeout period elapsed prior to completion of the operation or the server is not responding.
+2025-06-10 13:50:42 - Error saving scan data: The parameterized query '(@ScanDateTime datetime,@OriginalData nvarchar(82),@ExtractedDat' expects the parameter '@ReferenceCode', which was not supplied.
+2025-06-10 13:51:06 - Error saving scan data: The parameterized query '(@ScanDateTime datetime,@OriginalData nvarchar(83),@ExtractedDat' expects the parameter '@ReferenceCode', which was not supplied.
+2025-06-10 13:51:14 - Error saving scan data: The parameterized query '(@ScanDateTime datetime,@OriginalData nvarchar(7),@ExtractedData' expects the parameter '@ReferenceCode', which was not supplied.
+2025-06-10 13:51:33 - Error saving scan data: The parameterized query '(@ScanDateTime datetime,@OriginalData nvarchar(7),@ExtractedData' expects the parameter '@ReferenceCode', which was not supplied.
