@@ -1,305 +1,84 @@
+Imports System.Data
 Imports System.Data.SqlClient
-Imports System.Configuration
 Imports System.IO
 Imports System.Xml
 
+''' <summary>
+''' คลาสสำหรับจัดการฐานข้อมูล
+''' </summary>
 Public Class DatabaseManager
 
-#Region "Constants & Variables"
-    Private Shared _connectionString As String = ""
-    Private Shared _isConnected As Boolean = False
-#End Region
+    ' กำหนดพาธของไฟล์การตั้งค่า
+    Private Shared ReadOnly CONFIG_FILE As String = "Settings.config"
 
-#Region "Connection Management"
-    ''' <summary>
-    ''' เริ่มต้นการเชื่อมต่อฐานข้อมูล
-    ''' </summary>
-    Public Shared Function Initialize() As Boolean
-        Try
-            _connectionString = BuildConnectionString()
-            Return TestConnection()
-        Catch ex As Exception
-            LogError($"Database initialization failed: {ex.Message}")
-            Return False
-        End Try
-    End Function
+    ' ตัวแปรสำหรับการเชื่อมต่อฐานข้อมูล
+    Private Shared _server As String = "localhost"
+    Private Shared _database As String = "ScanData"
+    Private Shared _username As String = ""
+    Private Shared _password As String = ""
+    Private Shared _integratedSecurity As Boolean = True
+
+    ' Connection string สำหรับเชื่อมต่อฐานข้อมูล
+    Private Shared ReadOnly Property ConnectionString As String
+        Get
+            Dim builder As New SqlConnectionStringBuilder()
+            builder.DataSource = _server
+            builder.InitialCatalog = _database
+
+            If _integratedSecurity Then
+                builder.IntegratedSecurity = True
+            Else
+                builder.UserID = _username
+                builder.Password = _password
+            End If
+
+            builder.ConnectTimeout = 30
+            Return builder.ConnectionString
+        End Get
+    End Property
 
     ''' <summary>
-    ''' สร้าง connection string จากการตั้งค่า
+    ''' โหลดการตั้งค่าฐานข้อมูลจากไฟล์ config
     ''' </summary>
-    Private Shared Function BuildConnectionString() As String
+    Private Shared Sub LoadDatabaseSettings()
         Try
-            If File.Exists("Settings.config") Then
+            If File.Exists(CONFIG_FILE) Then
                 Dim doc As New XmlDocument()
-                doc.Load("Settings.config")
-                
-                Dim server As String = GetSettingValue(doc, "Server", "localhost")
-                Dim database As String = GetSettingValue(doc, "Database", "")
-                Dim username As String = GetSettingValue(doc, "Username", "")
-                Dim password As String = GetSettingValue(doc, "Password", "")
-                Dim integratedSecurity As Boolean = GetSettingValue(doc, "IntegratedSecurity", False)
-                
-                Dim builder As New SqlConnectionStringBuilder()
-                builder.DataSource = server
-                
-                If Not String.IsNullOrEmpty(database) Then
-                    builder.InitialCatalog = database
-                End If
-                
-                If integratedSecurity Then
-                    builder.IntegratedSecurity = True
-                Else
-                    builder.UserID = username
-                    builder.Password = DecryptPassword(password)
-                End If
-                
-                builder.ConnectTimeout = 30
+                doc.Load(CONFIG_FILE)
 
-                Return builder.ConnectionString
+                _server = GetSettingValueFromXML(doc, "Server", "localhost")
+                _database = GetSettingValueFromXML(doc, "Database", "ScanData")
+                _username = GetSettingValueFromXML(doc, "Username", "")
+                _password = GetSettingValueFromXML(doc, "Password", "")
+                _integratedSecurity = GetSettingValueFromXML(doc, "IntegratedSecurity", True)
+
+                Console.WriteLine($"Database settings loaded - Server: {_server}, Database: {_database}")
             End If
         Catch ex As Exception
-            LogError($"Error building connection string: {ex.Message}")
+            Console.WriteLine($"Error loading database settings: {ex.Message}")
         End Try
-        
-        Return ""
-    End Function
+    End Sub
 
     ''' <summary>
-    ''' ทดสอบการเชื่อมต่อฐานข้อมูล
+    ''' ดึงค่าจาก XML
     ''' </summary>
-    Public Shared Function TestConnection() As Boolean
-        Try
-            If String.IsNullOrEmpty(_connectionString) Then
-                Return False
-            End If
-
-            Using conn As New SqlConnection(_connectionString)
-                conn.Open()
-                _isConnected = True
-                Return True
-            End Using
-        Catch ex As Exception
-            _isConnected = False
-            LogError($"Database connection test failed: {ex.Message}")
-            Return False
-        End Try
-    End Function
-#End Region
-
-#Region "Scan Data Management"
-    ''' <summary>
-    ''' บันทึกข้อมูลการสแกน
-    ''' </summary>
-    Public Shared Function SaveScanData(scanData As ScanDataRecord) As Boolean
-        Try
-            If Not _isConnected Then
-                Initialize()
-            End If
-
-            Using conn As New SqlConnection(_connectionString)
-                conn.Open()
-                
-                Dim sql As String = "
-                    INSERT INTO ScanHistory 
-                    (ScanDateTime, OriginalData, ExtractedData, ProductCode, 
-                     ReferenceCode, Quantity, DateCode, IsValid, ValidationMessages, 
-                     ComputerName, UserName)
-                    VALUES 
-                    (@ScanDateTime, @OriginalData, @ExtractedData, @ProductCode, 
-                     @ReferenceCode, @Quantity, @DateCode, @IsValid, @ValidationMessages, 
-                     @ComputerName, @UserName)"
-                
-                Using cmd As New SqlCommand(sql, conn)
-                    cmd.Parameters.AddWithValue("@ScanDateTime", scanData.ScanDateTime)
-                    cmd.Parameters.AddWithValue("@OriginalData", scanData.OriginalData)
-                    cmd.Parameters.AddWithValue("@ExtractedData", scanData.ExtractedData)
-                    cmd.Parameters.AddWithValue("@ProductCode", scanData.ProductCode)
-                    cmd.Parameters.AddWithValue("@ReferenceCode", scanData.ReferenceCode)
-                    cmd.Parameters.AddWithValue("@Quantity", scanData.Quantity)
-                    cmd.Parameters.AddWithValue("@DateCode", scanData.DateCode)
-                    cmd.Parameters.AddWithValue("@IsValid", scanData.IsValid)
-                    cmd.Parameters.AddWithValue("@ValidationMessages", scanData.ValidationMessages)
-                    cmd.Parameters.AddWithValue("@ComputerName", Environment.MachineName)
-                    cmd.Parameters.AddWithValue("@UserName", Environment.UserName)
-                    
-                    cmd.ExecuteNonQuery()
-                End Using
-            End Using
-            
-            Return True
-            
-        Catch ex As Exception
-            LogError($"Error saving scan data: {ex.Message}")
-            Return False
-        End Try
-    End Function
-
-    ''' <summary>
-    ''' ดึงประวัติการสแกน
-    ''' </summary>
-    Public Shared Function GetScanHistory(Optional limit As Integer = 100) As List(Of ScanDataRecord)
-        Dim history As New List(Of ScanDataRecord)()
-        
-        Try
-            Console.WriteLine($"GetScanHistory called with limit: {limit}")
-            Console.WriteLine($"IsConnected: {_isConnected}")
-            Console.WriteLine($"ConnectionString: {If(String.IsNullOrEmpty(_connectionString), "Empty", "Set")}")
-            
-            If Not _isConnected Then
-                Console.WriteLine("Not connected, attempting to initialize...")
-                Initialize()
-            End If
-
-            If String.IsNullOrEmpty(_connectionString) Then
-                Console.WriteLine("Connection string is empty, returning empty list")
-                Return history
-            End If
-
-            Using conn As New SqlConnection(_connectionString)
-                Console.WriteLine("Opening connection...")
-                conn.Open()
-                Console.WriteLine("Connection opened successfully")
-                
-                Dim sql As String = $"
-                    SELECT TOP {limit} 
-                        ScanDateTime, OriginalData, ExtractedData, ProductCode, 
-                        ReferenceCode, Quantity, DateCode, IsValid, ValidationMessages,
-                        ComputerName, UserName
-                    FROM ScanHistory 
-                    ORDER BY ScanDateTime DESC"
-                
-                Console.WriteLine($"Executing SQL: {sql}")
-                
-                Using cmd As New SqlCommand(sql, conn)
-                    Using reader As SqlDataReader = cmd.ExecuteReader()
-                        Console.WriteLine("SQL executed, reading data...")
-                        
-                        Dim recordCount As Integer = 0
-                        While reader.Read()
-                            recordCount += 1
-                            
-                            Dim record As New ScanDataRecord() With {
-                                .ScanDateTime = If(IsDBNull(reader("ScanDateTime")), DateTime.MinValue, CDate(reader("ScanDateTime"))),
-                                .OriginalData = If(IsDBNull(reader("OriginalData")), "", reader("OriginalData").ToString()),
-                                .ExtractedData = If(IsDBNull(reader("ExtractedData")), "", reader("ExtractedData").ToString()),
-                                .ProductCode = If(IsDBNull(reader("ProductCode")), "", reader("ProductCode").ToString()),
-                                .ReferenceCode = If(IsDBNull(reader("ReferenceCode")), "", reader("ReferenceCode").ToString()),
-                                .Quantity = If(IsDBNull(reader("Quantity")), "", reader("Quantity").ToString()),
-                                .DateCode = If(IsDBNull(reader("DateCode")), "", reader("DateCode").ToString()),
-                                .IsValid = If(IsDBNull(reader("IsValid")), False, CBool(reader("IsValid"))),
-                                .ValidationMessages = If(IsDBNull(reader("ValidationMessages")), "", reader("ValidationMessages").ToString()),
-                                .ComputerName = If(IsDBNull(reader("ComputerName")), "", reader("ComputerName").ToString()),
-                                .UserName = If(IsDBNull(reader("UserName")), "", reader("UserName").ToString())
-                            }
-                            history.Add(record)
-                        End While
-                        
-                        Console.WriteLine($"Read {recordCount} records from database")
-                    End Using
-                End Using
-            End Using
-            
-        Catch ex As Exception
-            Console.WriteLine($"Error in GetScanHistory: {ex.Message}")
-            Console.WriteLine($"Stack trace: {ex.StackTrace}")
-            LogError($"Error getting scan history: {ex.Message}")
-        End Try
-        
-        Console.WriteLine($"Returning {history.Count} records")
-        Return history
-    End Function
-
-    ''' <summary>
-    ''' ลบข้อมูลเก่า
-    ''' </summary>
-    Public Shared Function CleanupOldData(daysToKeep As Integer) As Integer
-        Try
-            If Not _isConnected Then
-                Initialize()
-            End If
-
-            Using conn As New SqlConnection(_connectionString)
-                conn.Open()
-                
-                Dim cutoffDate As DateTime = DateTime.Now.AddDays(-daysToKeep)
-                Dim sql As String = "DELETE FROM ScanHistory WHERE ScanDateTime < @CutoffDate"
-                
-                Using cmd As New SqlCommand(sql, conn)
-                    cmd.Parameters.AddWithValue("@CutoffDate", cutoffDate)
-                    Return cmd.ExecuteNonQuery()
-                End Using
-            End Using
-            
-        Catch ex As Exception
-            LogError($"Error cleaning up old data: {ex.Message}")
-            Return 0
-        End Try
-    End Function
-#End Region
-
-#Region "Database Schema Management"
-    ''' <summary>
-    ''' สร้างตารางฐานข้อมูลหากยังไม่มี
-    ''' </summary>
-    Public Shared Function CreateTablesIfNotExists() As Boolean
-        Try
-            If Not _isConnected Then
-                Initialize()
-            End If
-
-            Using conn As New SqlConnection(_connectionString)
-                conn.Open()
-                
-                Dim sql As String = "
-                    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ScanHistory' AND xtype='U')
-                    BEGIN
-                        CREATE TABLE ScanHistory (
-                            ID int IDENTITY(1,1) PRIMARY KEY,
-                            ScanDateTime datetime NOT NULL,
-                            OriginalData nvarchar(max) NOT NULL,
-                            ExtractedData nvarchar(500),
-                            ProductCode nvarchar(100),
-                            ReferenceCode nvarchar(100),
-                            Quantity nvarchar(50),
-                            DateCode nvarchar(50),
-                            IsValid bit NOT NULL DEFAULT(0),
-                            ValidationMessages nvarchar(max),
-                            ComputerName nvarchar(100),
-                            UserName nvarchar(100),
-                            CreatedAt datetime DEFAULT(GETDATE())
-                        )
-                        
-                        CREATE INDEX IX_ScanHistory_ScanDateTime ON ScanHistory(ScanDateTime DESC)
-                        CREATE INDEX IX_ScanHistory_ProductCode ON ScanHistory(ProductCode)
-                        CREATE INDEX IX_ScanHistory_IsValid ON ScanHistory(IsValid)
-                    END"
-                
-                Using cmd As New SqlCommand(sql, conn)
-                    cmd.ExecuteNonQuery()
-                End Using
-            End Using
-            
-            Return True
-            
-        Catch ex As Exception
-            LogError($"Error creating database tables: {ex.Message}")
-            Return False
-        End Try
-    End Function
-#End Region
-
-#Region "Utility Methods"
-    Private Shared Function GetSettingValue(doc As XmlDocument, key As String, defaultValue As Object) As Object
+    Private Shared Function GetSettingValueFromXML(doc As XmlDocument, key As String, defaultValue As Object) As Object
         Try
             Dim node As XmlNode = doc.SelectSingleNode($"//Setting[@key='{key}']")
             If node IsNot Nothing Then
                 Dim value As String = node.Attributes("value").Value
+
                 Select Case defaultValue.GetType()
                     Case GetType(Boolean)
                         Return Boolean.Parse(value)
                     Case GetType(Integer)
                         Return Integer.Parse(value)
+                    Case GetType(Decimal)
+                        Return Decimal.Parse(value)
                     Case Else
+                        If key = "Password" Then
+                            Return DecryptPassword(value)
+                        End If
                         Return value
                 End Select
             End If
@@ -308,9 +87,14 @@ Public Class DatabaseManager
         Return defaultValue
     End Function
 
+    ''' <summary>
+    ''' ถอดรหัสพาสเวิร์ดแบบง่าย
+    ''' </summary>
     Private Shared Function DecryptPassword(encryptedPassword As String) As String
         Try
             If String.IsNullOrEmpty(encryptedPassword) Then Return ""
+
+            ' การถอดรหัสแบบง่าย (จาก Base64)
             Dim bytes As Byte() = Convert.FromBase64String(encryptedPassword)
             Return System.Text.Encoding.UTF8.GetString(bytes)
         Catch
@@ -318,46 +102,337 @@ Public Class DatabaseManager
         End Try
     End Function
 
-    Private Shared Sub LogError(message As String)
+    ''' <summary>
+    ''' ตรวจสอบการเชื่อมต่อฐานข้อมูล
+    ''' </summary>
+    ''' <returns>True ถ้าเชื่อมต่อได้, False ถ้าเชื่อมต่อไม่ได้</returns>
+    Public Shared Function IsConnected() As Boolean
         Try
-            Dim logPath As String = Path.Combine(Application.StartupPath, "Logs")
-            If Not Directory.Exists(logPath) Then
-                Directory.CreateDirectory(logPath)
-            End If
-            
-            Dim logFile As String = Path.Combine(logPath, $"Database_{DateTime.Now:yyyyMMdd}.log")
-            Dim logEntry As String = $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} - {message}{Environment.NewLine}"
-            
-            File.AppendAllText(logFile, logEntry)
-        Catch
-            ' ไม่ต้องทำอะไร
+            Using conn As New SqlConnection(ConnectionString)
+                conn.Open()
+                conn.Close()
+                Return True
+            End Using
+        Catch ex As Exception
+            Console.WriteLine($"Connection error: {ex.Message}")
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' เริ่มต้นการใช้งานฐานข้อมูล
+    ''' </summary>
+    ''' <returns>True ถ้าเริ่มต้นสำเร็จ, False ถ้าเริ่มต้นไม่สำเร็จ</returns>
+    Public Shared Function Initialize() As Boolean
+        Try
+            ' โหลดการตั้งค่าฐานข้อมูล
+            LoadDatabaseSettings()
+
+            ' ตรวจสอบการเชื่อมต่อและสร้างฐานข้อมูล
+            InitializeDatabase()
+            CreateTablesIfNotExists()
+            Return IsConnected()
+        Catch ex As Exception
+            Console.WriteLine($"Error initializing database: {ex.Message}")
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' สร้างตารางในฐานข้อมูลถ้ายังไม่มี
+    ''' </summary>
+    Public Shared Sub CreateTablesIfNotExists()
+        Try
+            Using conn As New SqlConnection(ConnectionString)
+                conn.Open()
+
+                ' ตรวจสอบว่ามีตาราง ScanRecords หรือไม่
+                Dim tableExists As Boolean = False
+                Dim checkTableCmd As New SqlCommand(
+                    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'ScanRecords'", conn)
+                tableExists = (Convert.ToInt32(checkTableCmd.ExecuteScalar()) > 0)
+
+                ' สร้างตาราง ScanRecords ถ้ายังไม่มี
+                If Not tableExists Then
+                    Dim createTableCmd As New SqlCommand(
+                        "CREATE TABLE ScanRecords (" &
+                        "Id INT IDENTITY(1,1) PRIMARY KEY, " &
+                        "ScanDateTime DATETIME NOT NULL, " &
+                        "ProductCode NVARCHAR(255), " &
+                        "ReferenceCode NVARCHAR(255), " &
+                        "Quantity INT, " &
+                        "DateCode NVARCHAR(255), " &
+                        "IsValid BIT, " &
+                        "OriginalData NVARCHAR(MAX), " &
+                        "ExtractedData NVARCHAR(MAX), " &
+                        "ValidationMessages NVARCHAR(MAX), " &
+                        "ComputerName NVARCHAR(255), " &
+                        "UserName NVARCHAR(255)" &
+                        ")", conn)
+
+                    createTableCmd.ExecuteNonQuery()
+                    Console.WriteLine("ScanRecords table created successfully")
+                End If
+
+                conn.Close()
+            End Using
+
+            Console.WriteLine("Tables created or already exist")
+        Catch ex As Exception
+            Console.WriteLine($"Error creating tables: {ex.Message}")
+            Throw New Exception($"ไม่สามารถสร้างตารางในฐานข้อมูลได้: {ex.Message}", ex)
         End Try
     End Sub
 
-    Public Shared ReadOnly Property IsConnected As Boolean
-        Get
-            Return _isConnected
-        End Get
-    End Property
-#End Region
+    ''' <summary>
+    ''' บันทึกข้อมูลการสแกน
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกน</param>
+    ''' <returns>ID ของรายการที่บันทึก</returns>
+    Public Shared Function SaveScanData(record As ScanDataRecord) As Integer
+        Return AddScanRecord(record)
+    End Function
 
+    ''' <summary>
+    ''' สร้างฐานข้อมูลถ้ายังไม่มี
+    ''' </summary> 
+    Public Shared Sub InitializeDatabase()
+        Try
+            ' ตรวจสอบว่าสามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้หรือไม่
+            Using masterConn As New SqlConnection($"Data Source={_server};Initial Catalog=master;{If(_integratedSecurity, "Integrated Security=True", $"User ID={_username};Password={_password}")}")
+                masterConn.Open()
+
+                ' ตรวจสอบว่ามีฐานข้อมูลหรือไม่
+                Dim checkDatabaseCmd As New SqlCommand($"SELECT COUNT(*) FROM sys.databases WHERE name = '{_database}'", masterConn)
+                Dim databaseExists As Boolean = (Convert.ToInt32(checkDatabaseCmd.ExecuteScalar()) > 0)
+
+                ' สร้างฐานข้อมูลถ้ายังไม่มี
+                If Not databaseExists Then
+                    Dim createDatabaseCmd As New SqlCommand($"CREATE DATABASE [{_database}]", masterConn)
+                    createDatabaseCmd.ExecuteNonQuery()
+                    Console.WriteLine($"Database '{_database}' created successfully")
+                End If
+
+                masterConn.Close()
+            End Using
+
+            Console.WriteLine($"Database '{_database}' initialized successfully")
+
+        Catch ex As Exception
+            Console.WriteLine($"Error initializing database: {ex.Message}")
+            Throw New Exception($"ไม่สามารถสร้างฐานข้อมูลได้: {ex.Message}", ex)
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' เพิ่มข้อมูลการสแกนใหม่
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกน</param>
+    ''' <returns>ID ของรายการที่เพิ่ม</returns>
+    Public Shared Function AddScanRecord(record As ScanDataRecord) As Integer
+        Try
+            Using conn As New SqlConnection(ConnectionString)
+                conn.Open()
+
+                Dim insertCmd As New SqlCommand(
+                    "INSERT INTO ScanRecords " &
+                    "(ScanDateTime, ProductCode, ReferenceCode, Quantity, DateCode, IsValid, OriginalData, ExtractedData, ValidationMessages, ComputerName, UserName) " &
+                    "VALUES (@ScanDateTime, @ProductCode, @ReferenceCode, @Quantity, @DateCode, @IsValid, @OriginalData, @ExtractedData, @ValidationMessages, @ComputerName, @UserName); " &
+                    "SELECT SCOPE_IDENTITY();", conn)
+
+                ' เพิ่มพารามิเตอร์
+                insertCmd.Parameters.AddWithValue("@ScanDateTime", record.ScanDateTime)
+                insertCmd.Parameters.AddWithValue("@ProductCode", If(record.ProductCode, DBNull.Value))
+                insertCmd.Parameters.AddWithValue("@ReferenceCode", If(record.ReferenceCode, DBNull.Value))
+                insertCmd.Parameters.AddWithValue("@Quantity", record.Quantity)
+                insertCmd.Parameters.AddWithValue("@DateCode", If(record.DateCode, DBNull.Value))
+                insertCmd.Parameters.AddWithValue("@IsValid", record.IsValid)
+                insertCmd.Parameters.AddWithValue("@OriginalData", If(record.OriginalData, DBNull.Value))
+                insertCmd.Parameters.AddWithValue("@ExtractedData", If(record.ExtractedData, DBNull.Value))
+                insertCmd.Parameters.AddWithValue("@ValidationMessages", If(record.ValidationMessages, DBNull.Value))
+                insertCmd.Parameters.AddWithValue("@ComputerName", If(record.ComputerName, DBNull.Value))
+                insertCmd.Parameters.AddWithValue("@UserName", If(record.UserName, DBNull.Value))
+
+                ' ดึง ID ที่เพิ่มล่าสุด
+                Dim id As Integer = Convert.ToInt32(insertCmd.ExecuteScalar())
+                record.Id = id
+
+                conn.Close()
+
+                Console.WriteLine($"Added scan record with ID: {id}")
+                Return id
+            End Using
+ 
+        Catch ex As Exception
+            Console.WriteLine($"Error adding scan record: {ex.Message}")
+            Throw New Exception($"ไม่สามารถเพิ่มข้อมูลการสแกนได้: {ex.Message}", ex)
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ดึงข้อมูลประวัติการสแกนทั้งหมด
+    ''' </summary>
+    ''' <param name="limit">จำนวนรายการสูงสุดที่ต้องการดึง</param>
+    ''' <returns>รายการข้อมูลการสแกน</returns>
+    Public Shared Function GetScanHistory(Optional limit As Integer = 1000) As List(Of ScanDataRecord)
+        Try
+            Dim results As New List(Of ScanDataRecord)()
+
+            Using conn As New SqlConnection(ConnectionString)
+                conn.Open()
+
+                Dim limitClause As String = If(limit > 0, $" TOP {limit}", "")
+                Dim selectCmd As New SqlCommand($"SELECT{limitClause} * FROM ScanRecords ORDER BY ScanDateTime DESC", conn)
+
+                Using reader As SqlDataReader = selectCmd.ExecuteReader()
+                    While reader.Read()
+                        Dim record As New ScanDataRecord()
+
+                        record.Id = Convert.ToInt32(reader("Id"))
+                        record.ScanDateTime = Convert.ToDateTime(reader("ScanDateTime"))
+                        record.ProductCode = If(reader("ProductCode") IsNot DBNull.Value, reader("ProductCode").ToString(), "")
+                        record.ReferenceCode = If(reader("ReferenceCode") IsNot DBNull.Value, reader("ReferenceCode").ToString(), "")
+                        record.Quantity = If(reader("Quantity") IsNot DBNull.Value, Convert.ToInt32(reader("Quantity")), 0)
+                        record.DateCode = If(reader("DateCode") IsNot DBNull.Value, reader("DateCode").ToString(), "")
+                        record.IsValid = Convert.ToBoolean(reader("IsValid"))
+                        record.OriginalData = If(reader("OriginalData") IsNot DBNull.Value, reader("OriginalData").ToString(), "")
+                        record.ExtractedData = If(reader("ExtractedData") IsNot DBNull.Value, reader("ExtractedData").ToString(), "")
+                        record.ValidationMessages = If(reader("ValidationMessages") IsNot DBNull.Value, reader("ValidationMessages").ToString(), "")
+                        record.ComputerName = If(reader("ComputerName") IsNot DBNull.Value, reader("ComputerName").ToString(), "")
+                        record.UserName = If(reader("UserName") IsNot DBNull.Value, reader("UserName").ToString(), "")
+
+                        results.Add(record)
+                    End While
+                End Using
+
+                conn.Close()
+            End Using
+
+            Console.WriteLine($"Retrieved {results.Count} scan records")
+            Return results
+
+        Catch ex As Exception
+            Console.WriteLine($"Error getting scan history: {ex.Message}")
+            Throw New Exception($"ไม่สามารถดึงข้อมูลประวัติการสแกนได้: {ex.Message}", ex)
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ลบข้อมูลการสแกนตาม ID
+    ''' </summary>
+    ''' <param name="id">ID ของรายการที่ต้องการลบ</param>
+    ''' <returns>True ถ้าลบสำเร็จ, False ถ้าไม่สำเร็จ</returns>
+    Public Shared Function DeleteScanRecord(id As Integer) As Boolean
+        Try
+            Using conn As New SqlConnection(ConnectionString)
+                conn.Open()
+
+                Dim deleteCmd As New SqlCommand("DELETE FROM ScanRecords WHERE Id = @Id", conn)
+                deleteCmd.Parameters.AddWithValue("@Id", id)
+
+                Dim rowsAffected As Integer = deleteCmd.ExecuteNonQuery()
+                conn.Close()
+
+                Console.WriteLine($"Deleted scan record ID {id}, rows affected: {rowsAffected}")
+                Return rowsAffected > 0
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine($"Error deleting scan record: {ex.Message}")
+            Throw New Exception($"ไม่สามารถลบข้อมูลการสแกนได้: {ex.Message}", ex)
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' อัปเดตข้อมูลการสแกน
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกนที่อัปเดต</param>
+    ''' <returns>True ถ้าอัปเดตสำเร็จ, False ถ้าไม่สำเร็จ</returns>
+    Public Shared Function UpdateScanRecord(record As ScanDataRecord) As Boolean
+        Try
+            Using conn As New SqlConnection(ConnectionString)
+                conn.Open()
+
+                Dim updateCmd As New SqlCommand(
+                    "UPDATE ScanRecords SET " &
+                    "ProductCode = @ProductCode, " &
+                    "ReferenceCode = @ReferenceCode, " &
+                    "Quantity = @Quantity, " &
+                    "DateCode = @DateCode, " &
+                    "IsValid = @IsValid, " &
+                    "ExtractedData = @ExtractedData, " &
+                    "ValidationMessages = @ValidationMessages " &
+                    "WHERE Id = @Id", conn)
+
+                ' เพิ่มพารามิเตอร์
+                updateCmd.Parameters.AddWithValue("@ProductCode", If(record.ProductCode, DBNull.Value))
+                updateCmd.Parameters.AddWithValue("@ReferenceCode", If(record.ReferenceCode, DBNull.Value))
+                updateCmd.Parameters.AddWithValue("@Quantity", record.Quantity)
+                updateCmd.Parameters.AddWithValue("@DateCode", If(record.DateCode, DBNull.Value))
+                updateCmd.Parameters.AddWithValue("@IsValid", record.IsValid)
+                updateCmd.Parameters.AddWithValue("@ExtractedData", If(record.ExtractedData, DBNull.Value))
+                updateCmd.Parameters.AddWithValue("@ValidationMessages", If(record.ValidationMessages, DBNull.Value))
+                updateCmd.Parameters.AddWithValue("@Id", record.Id)
+
+                Dim rowsAffected As Integer = updateCmd.ExecuteNonQuery()
+                conn.Close()
+
+                Console.WriteLine($"Updated scan record ID {record.Id}, rows affected: {rowsAffected}")
+                Return rowsAffected > 0
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine($"Error updating scan record: {ex.Message}")
+            Throw New Exception($"ไม่สามารถอัปเดตข้อมูลการสแกนได้: {ex.Message}", ex)
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ค้นหาข้อมูลการสแกนตามรหัสผลิตภัณฑ์
+    ''' </summary>
+    ''' <param name="productCode">รหัสผลิตภัณฑ์</param>
+    ''' <returns>รายการข้อมูลการสแกนที่ตรงกับรหัสผลิตภัณฑ์</returns>
+    Public Shared Function SearchByProductCode(productCode As String) As List(Of ScanDataRecord)
+        Try
+            Dim results As New List(Of ScanDataRecord)()
+
+            Using conn As New SqlConnection(ConnectionString)
+                conn.Open()
+
+                Dim selectCmd As New SqlCommand("SELECT * FROM ScanRecords WHERE ProductCode LIKE @ProductCode ORDER BY ScanDateTime DESC", conn)
+                selectCmd.Parameters.AddWithValue("@ProductCode", $"%{productCode}%")
+
+                Using reader As SqlDataReader = selectCmd.ExecuteReader()
+                    While reader.Read()
+                        Dim record As New ScanDataRecord()
+
+                        record.Id = Convert.ToInt32(reader("Id"))
+                        record.ScanDateTime = Convert.ToDateTime(reader("ScanDateTime"))
+                        record.ProductCode = If(reader("ProductCode") IsNot DBNull.Value, reader("ProductCode").ToString(), "")
+                        record.ReferenceCode = If(reader("ReferenceCode") IsNot DBNull.Value, reader("ReferenceCode").ToString(), "")
+                        record.Quantity = If(reader("Quantity") IsNot DBNull.Value, Convert.ToInt32(reader("Quantity")), 0)
+                        record.DateCode = If(reader("DateCode") IsNot DBNull.Value, reader("DateCode").ToString(), "")
+                        record.IsValid = Convert.ToBoolean(reader("IsValid"))
+                        record.OriginalData = If(reader("OriginalData") IsNot DBNull.Value, reader("OriginalData").ToString(), "")
+                        record.ExtractedData = If(reader("ExtractedData") IsNot DBNull.Value, reader("ExtractedData").ToString(), "")
+                        record.ValidationMessages = If(reader("ValidationMessages") IsNot DBNull.Value, reader("ValidationMessages").ToString(), "")
+                        record.ComputerName = If(reader("ComputerName") IsNot DBNull.Value, reader("ComputerName").ToString(), "")
+                        record.UserName = If(reader("UserName") IsNot DBNull.Value, reader("UserName").ToString(), "")
+
+                        results.Add(record)
+                    End While
+                End Using
+                
+                conn.Close()
+            End Using
+            
+            Console.WriteLine($"Found {results.Count} records for product code: {productCode}")
+            Return results
+            
+        Catch ex As Exception
+            Console.WriteLine($"Error searching by product code: {ex.Message}")
+            Throw New Exception($"ไม่สามารถค้นหาข้อมูลตามรหัสผลิตภัณฑ์ได้: {ex.Message}", ex)
+        End Try
+    End Function
 End Class
 
-#Region "Supporting Classes"
-''' <summary>
-''' โครงสร้างข้อมูลการสแกน
-''' </summary>
-Public Class ScanDataRecord
-    Public Property ScanDateTime As DateTime
-    Public Property OriginalData As String
-    Public Property ExtractedData As String
-    Public Property ProductCode As String
-    Public Property ReferenceCode As String
-    Public Property Quantity As String
-    Public Property DateCode As String
-    Public Property IsValid As Boolean
-    Public Property ValidationMessages As String
-    Public Property ComputerName As String
-    Public Property UserName As String
-End Class
-#End Region

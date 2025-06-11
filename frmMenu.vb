@@ -16,7 +16,7 @@ Public Class frmMenu
     Private lastKeyTime As DateTime = DateTime.Now
 
     ' Settings variables
-    Private scanTimeout As Integer = 100
+    Private scanTimeout As Integer = 100 
     Private showFullData As Boolean = False
     Private autoExtract As Boolean = True
     Private soundEnabled As Boolean = True
