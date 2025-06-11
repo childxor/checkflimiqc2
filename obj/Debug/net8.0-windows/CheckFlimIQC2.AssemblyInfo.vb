@@ -16,7 +16,7 @@ Imports System.Reflection
 <Assembly: System.Reflection.AssemblyCompanyAttribute("CheckFlimIQC2"),  _
  Assembly: System.Reflection.AssemblyConfigurationAttribute("Debug"),  _
  Assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0"),  _
- Assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6d470a6d53839a770d1fec5d295871219e2a0c53"),  _
+ Assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8d4161e43e8c6fd245a02301f235c1a368f97638"),  _
  Assembly: System.Reflection.AssemblyProductAttribute("CheckFlimIQC2"),  _
  Assembly: System.Reflection.AssemblyTitleAttribute("CheckFlimIQC2"),  _
  Assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0"),  _

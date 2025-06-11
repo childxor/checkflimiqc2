@@ -139,6 +139,15 @@ Public Class frmHistory
             btnCol.Width = 120
             dgvHistory.Columns.Add(btnCol)
 
+            ' สร้างคอลัมน์ปุ่มสร้าง Mission
+            Dim btnCreateMission As New DataGridViewButtonColumn()
+            btnCreateMission.Name = "btnCreateMission"
+            btnCreateMission.HeaderText = "สร้าง Mission"
+            btnCreateMission.Text = "🚀 สร้าง"
+            btnCreateMission.UseColumnTextForButtonValue = True
+            btnCreateMission.Width = 65
+            dgvHistory.Columns.Add(btnCreateMission)
+
             ' สร้างคอลัมน์วันที่/เวลา
             Dim colDateTime As New DataGridViewTextBoxColumn()
             colDateTime.Name = "ScanDateTime"
@@ -619,24 +628,171 @@ Public Class frmHistory
                         message.AppendLine($"• ข้อมูลหลัก: {result.FirstMatch.Column4Value}")
                     End If
 
-                    'ใช้ข้อมูลจาก FirstMatch.Column4Value หาไฟล์จาก path \\fls951\OAFAB\OA2FAB\20250607 Pimploy S ทุกโฟลเดอร์ และในโฟลเดอร์จะมีโฟลเดอร์อีกให้หาไฟล์ที่มีชื่อตาม FirstMatch.Column4Value
-                    Dim folderPath As String = "\\fls951\OAFAB\OA2FAB\20250607 Pimploy S"
-                    Dim fileName As String = result.FirstMatch.Column4Value
-                    ' SN1C63Z083XU-01N_US_VA-01 ฉันต้องการหาไฟล์ที่เป็นแบบ Like 'SN1C63Z083XU-01N%'
-                    Dim searchPattern As String = fileName & "_%"
-                    Dim filePaths As String() = Directory.GetFiles(folderPath, searchPattern, SearchOption.AllDirectories)
-                    If filePaths.Length > 0 Then
-                        message.AppendLine($"• ไฟล์ที่พบ: {filePaths(0)} อยู่ในโฟลเดอร์: {Path.GetDirectoryName(filePaths(0))}")
+                    ' ค้นหาไฟล์ในโฟลเดอร์ตามข้อมูลที่พบ
+                    Dim fileSearchResult = SearchFilesInDirectory(result.FirstMatch.Column4Value)
+                    If fileSearchResult.FilesFound.Count > 0 Then
+                        message.AppendLine()
+                        message.AppendLine($"🔍 พบไฟล์ที่เกี่ยวข้อง: {fileSearchResult.FilesFound.Count} ไฟล์")
+
+                        ' แสดงไฟล์ที่พบ (จำกัดที่ 5 ไฟล์แรก)
+                        Dim maxDisplay As Integer = Math.Min(5, fileSearchResult.FilesFound.Count)
+                        For i As Integer = 0 To maxDisplay - 1
+                            Dim fileInfo = fileSearchResult.FilesFound(i)
+                            message.AppendLine($"  📁 {fileInfo.FileName}")
+                            message.AppendLine($"     ตำแหน่ง: {fileInfo.RelativePath}")
+                            message.AppendLine($"     ขนาด: {FormatFileSize(fileInfo.FileSize)}")
+                            message.AppendLine($"     แก้ไขล่าสุด: {fileInfo.LastModified:yyyy-MM-dd HH:mm}")
+                            message.AppendLine()
+                        Next
+
+                        If fileSearchResult.FilesFound.Count > 5 Then
+                            message.AppendLine($"... และอีก {fileSearchResult.FilesFound.Count - 5} ไฟล์")
+                            message.AppendLine()
+                        End If
+
+                        ' แสดงสถิติการค้นหา
+                        message.AppendLine($"📊 สถิติการค้นหา:")
+                        message.AppendLine($"• โฟลเดอร์ที่ค้นหาทั้งหมด: {fileSearchResult.DirectoriesSearched}")
+                        message.AppendLine($"• เวลาที่ใช้: {fileSearchResult.SearchDuration.TotalSeconds:F2} วินาที")
+
+                        If fileSearchResult.ErrorDirectories.Count > 0 Then
+                            message.AppendLine($"• โฟลเดอร์ที่เข้าถึงไม่ได้: {fileSearchResult.ErrorDirectories.Count}")
+                        End If
+                    Else
+                        message.AppendLine()
+                        message.AppendLine($"❌ ไม่พบไฟล์ที่เกี่ยวข้องกับ '{result.FirstMatch.Column4Value}'")
+                        If fileSearchResult.ErrorDirectories.Count > 0 Then
+                            message.AppendLine($"⚠️ มีโฟลเดอร์ที่เข้าถึงไม่ได้ {fileSearchResult.ErrorDirectories.Count} โฟลเดอร์")
+                        End If
                     End If
                 End If
 
                 MessageBox.Show(message.ToString(), "ผลการค้นหา Excel",
-                              MessageBoxButtons.OK, MessageBoxIcon.Information)
+                          MessageBoxButtons.OK, MessageBoxIcon.Information)
 
-                ' เสนอให้เปิดไฟล์
+                ' เสนอให้เปิดไฟล์ Excel
                 If MessageBox.Show("ต้องการเปิดไฟล์ Excel เพื่อดูข้อมูลเพิ่มเติมหรือไม่?",
-                                  "เปิดไฟล์ Excel", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) = System.Windows.Forms.DialogResult.Yes Then
+                              "เปิดไฟล์ Excel", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
                     OpenFileWithErrorHandling(result.ExcelFilePath)
+                End If
+
+                ' ถ้าพบไฟล์ ให้เสนอให้เปิดโฟลเดอร์หรือเปิดไฟล์โดยตรง
+                Dim fileSearchResult2 = SearchFilesInDirectory(result.FirstMatch.Column4Value)
+                If fileSearchResult2.FilesFound.Count > 0 Then
+                    ' ถ้ามีไฟล์เดียว เสนอให้เปิดไฟล์หรือโฟลเดอร์
+                    If fileSearchResult2.FilesFound.Count = 1 Then
+                        Dim options As String() = {"เปิดไฟล์", "เปิดโฟลเดอร์", "ยกเลิก"}
+                        Dim result2 = MessageBox.Show($"พบ 1 ไฟล์: {fileSearchResult2.FilesFound(0).FileName}{vbNewLine}ต้องการดำเนินการอย่างไร?",
+                                    "เปิดไฟล์หรือโฟลเดอร์", MessageBoxButtons.YesNoCancel, MessageBoxIcon.Question)
+
+                        If result2 = DialogResult.Yes Then ' เปิดไฟล์
+                            OpenFileWithErrorHandling(fileSearchResult2.FilesFound(0).FullPath)
+                        ElseIf result2 = DialogResult.No Then ' เปิดโฟลเดอร์
+                            Dim fileDir = Path.GetDirectoryName(fileSearchResult2.FilesFound(0).FullPath)
+                            OpenFileWithErrorHandling(fileDir)
+                        End If
+                    Else
+                        ' มีหลายไฟล์ ให้แสดงรายการให้เลือก
+                        Dim fileListForm As New Form()
+                        fileListForm.Text = "เลือกไฟล์ที่ต้องการเปิด"
+                        fileListForm.Size = New Size(600, 400)
+                        fileListForm.StartPosition = FormStartPosition.CenterParent
+                        fileListForm.MinimizeBox = False
+                        fileListForm.MaximizeBox = False
+                        fileListForm.FormBorderStyle = FormBorderStyle.FixedDialog
+
+                        ' สร้าง ListView สำหรับแสดงรายการไฟล์
+                        Dim listView As New ListView()
+                        listView.View = View.Details
+                        listView.FullRowSelect = True
+                        listView.GridLines = True
+                        listView.Dock = DockStyle.Fill
+                        listView.Columns.Add("ชื่อไฟล์", 200)
+                        listView.Columns.Add("ขนาด", 80)
+                        listView.Columns.Add("แก้ไขล่าสุด", 120)
+                        listView.Columns.Add("เส้นทาง", 350)
+
+                        ' เพิ่มไฟล์ลงใน ListView 
+                        For Each file In fileSearchResult2.FilesFound
+                            Dim item As New ListViewItem(file.FileName)
+                            item.SubItems.Add(FormatFileSize(file.FileSize))
+                            item.SubItems.Add(file.LastModified.ToString("yyyy-MM-dd HH:mm"))
+                            item.SubItems.Add(file.RelativePath)
+                            item.Tag = file.FullPath
+                            listView.Items.Add(item)
+                        Next
+
+                        ' ปรับขนาดคอลัมน์
+                        listView.AutoResizeColumns(ColumnHeaderAutoResizeStyle.HeaderSize)
+
+                        ' สร้าง Panel สำหรับใส่ปุ่ม
+                        Dim buttonPanel As New Panel()
+                        buttonPanel.Dock = DockStyle.Bottom
+                        buttonPanel.Height = 50
+
+                        ' สร้างปุ่มเปิดไฟล์
+                        Dim btnOpen As New System.Windows.Forms.Button()
+                        btnOpen.Text = "เปิดไฟล์"
+                        btnOpen.Width = 100
+                        btnOpen.Location = New System.Drawing.Point(10, 10)
+                        btnOpen.Enabled = False
+
+                        ' สร้างปุ่มเปิดโฟลเดอร์
+                        Dim btnOpenFolder As New System.Windows.Forms.Button()
+                        btnOpenFolder.Text = "เปิดโฟลเดอร์"
+                        btnOpenFolder.Width = 100
+                        btnOpenFolder.Location = New System.Drawing.Point(120, 10)
+                        btnOpenFolder.Enabled = False
+
+                        ' สร้างปุ่มยกเลิก
+                        Dim btnCancel As New System.Windows.Forms.Button()
+                        btnCancel.Text = "ยกเลิก"
+                        btnCancel.Width = 100
+                        btnCancel.Location = New System.Drawing.Point(230, 10)
+                        btnCancel.DialogResult = DialogResult.Cancel
+
+                        ' กำหนด Event เมื่อเลือกไฟล์
+                        AddHandler listView.SelectedIndexChanged, Sub()
+                                                                      btnOpen.Enabled = listView.SelectedItems.Count > 0
+                                                                      btnOpenFolder.Enabled = listView.SelectedItems.Count > 0
+                                                                  End Sub
+
+                        ' กำหนด Event เมื่อดับเบิลคลิกที่ไฟล์
+                        AddHandler listView.DoubleClick, Sub()
+                                                             If listView.SelectedItems.Count > 0 Then
+                                                                 OpenFileWithErrorHandling(listView.SelectedItems(0).Tag.ToString())
+                                                                 fileListForm.Close()
+                                                             End If
+                                                         End Sub
+
+                        ' กำหนด Event เมื่อคลิกปุ่มเปิดไฟล์
+                        AddHandler btnOpen.Click, Sub()
+                                                      If listView.SelectedItems.Count > 0 Then
+                                                          OpenFileWithErrorHandling(listView.SelectedItems(0).Tag.ToString())
+                                                          fileListForm.Close()
+                                                      End If
+                                                  End Sub
+
+                        ' กำหนด Event เมื่อคลิกปุ่มเปิดโฟลเดอร์
+                        AddHandler btnOpenFolder.Click, Sub()
+                                                            If listView.SelectedItems.Count > 0 Then
+                                                                Dim selectedFilePath = listView.SelectedItems(0).Tag.ToString()
+                                                                Dim fileDir = Path.GetDirectoryName(selectedFilePath)
+                                                                OpenFileWithErrorHandling(fileDir)
+                                                                fileListForm.Close()
+                                                            End If
+                                                        End Sub
+
+                        ' เพิ่ม Controls ลงในฟอร์ม
+                        buttonPanel.Controls.Add(btnOpen)
+                        buttonPanel.Controls.Add(btnOpenFolder)
+                        buttonPanel.Controls.Add(btnCancel)
+                        fileListForm.Controls.Add(listView)
+                        fileListForm.Controls.Add(buttonPanel)
+
+                        ' แสดงฟอร์ม
+                        fileListForm.ShowDialog()
+                    End If
                 End If
             Else
                 ' ไม่พบข้อมูล
@@ -646,19 +802,180 @@ Public Class frmHistory
                     message &= vbNewLine & vbNewLine & $"ข้อผิดพลาด: {result.ErrorMessage}"
                 End If
 
-                Dim dialogResult As System.Windows.Forms.DialogResult = MessageBox.Show(message & vbNewLine & vbNewLine & "ต้องการเปิดไฟล์ Excel เพื่อตรวจสอบด้วยตนเองหรือไม่?",
-                                                                  "ผลการค้นหา Excel", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Information)
+                Dim dialogResult As DialogResult = MessageBox.Show(message & vbNewLine & vbNewLine & "ต้องการเปิดไฟล์ Excel เพื่อตรวจสอบด้วยตนเองหรือไม่?",
+                                                          "ผลการค้นหา Excel", MessageBoxButtons.YesNo, MessageBoxIcon.Information)
 
-                If dialogResult = System.Windows.Forms.DialogResult.Yes Then
+                If dialogResult = DialogResult.Yes Then
                     OpenFileWithErrorHandling(result.ExcelFilePath)
                 End If
             End If
 
         Catch ex As Exception
             MessageBox.Show($"เกิดข้อผิดพลาดในการแสดงผลลัพธ์: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                      "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
+
+    ''' <summary>
+    ''' ค้นหาไฟล์ในโฟลเดอร์ตามชื่อที่กำหนด
+    ''' </summary>
+    Private Function SearchFilesInDirectory(fileName As String) As FileSearchResult
+        Dim result As New FileSearchResult()
+        Dim stopwatch As New Stopwatch()
+        stopwatch.Start()
+
+        Try
+            If String.IsNullOrEmpty(fileName) Then
+                Return result
+            End If
+
+            ' โฟลเดอร์หลักที่จะค้นหา
+            Dim baseFolderPath As String = "\\fls951\OAFAB\OA2FAB\Film charecter check"
+
+            ' ตรวจสอบว่าโฟลเดอร์หลักมีอยู่จริงหรือไม่
+            If Not Directory.Exists(baseFolderPath) Then
+                result.ErrorDirectories.Add($"โฟลเดอร์หลักไม่พบ: {baseFolderPath}")
+                Return result
+            End If
+
+            ' สร้าง pattern สำหรับค้นหา
+            Dim searchPatterns As String() = {
+            fileName & "_*",           ' SN1C63Z083XU-01N_*
+            fileName & ".*",           ' SN1C63Z083XU-01N.*
+            "*" & fileName & "*",      ' *SN1C63Z083XU-01N*
+            fileName                   ' SN1C63Z083XU-01N (ตรงทุกตัว)
+        }
+
+            ' ค้นหาในทุกโฟลเดอร์ย่อย
+            SearchInDirectoryRecursive(baseFolderPath, searchPatterns, result)
+
+        Catch ex As Exception
+            result.ErrorDirectories.Add($"ข้อผิดพลาดทั่วไป: {ex.Message}")
+        Finally
+            stopwatch.Stop()
+            result.SearchDuration = stopwatch.Elapsed
+        End Try
+
+        Return result
+    End Function
+
+    ''' <summary>
+    ''' ค้นหาไฟล์แบบ recursive ในทุกโฟลเดอร์ย่อย
+    ''' </summary>
+    Private Sub SearchInDirectoryRecursive(directoryPath As String, searchPatterns As String(), result As FileSearchResult)
+        Try
+            result.DirectoriesSearched += 1
+
+            ' ค้นหาไฟล์ในโฟลเดอร์ปัจจุบัน
+            For Each pattern As String In searchPatterns
+                Try
+                    Dim files As String() = Directory.GetFiles(directoryPath, pattern, SearchOption.TopDirectoryOnly)
+
+                    For Each filePath As String In files
+                        Try
+                            Dim fileInfo As New FileInfo(filePath)
+
+                            ' สร้างข้อมูลไฟล์
+                            Dim fileDetail As New FileDetail() With {
+                            .FileName = Path.GetFileName(filePath),
+                            .FullPath = filePath,
+                            .RelativePath = GetRelativePath("\\fls951\OAFAB\OA2FAB\20250607 Pimploy S", filePath),
+                            .FileSize = fileInfo.Length,
+                            .LastModified = fileInfo.LastWriteTime
+                        }
+
+                            ' ตรวจสอบว่าไฟล์นี้ยังไม่ได้เพิ่มแล้ว (ป้องกันการซ้ำ)
+                            If Not result.FilesFound.Any(Function(f) f.FullPath.Equals(filePath, StringComparison.OrdinalIgnoreCase)) Then
+                                result.FilesFound.Add(fileDetail)
+                            End If
+
+                        Catch fileEx As Exception
+                            ' ข้ามไฟล์ที่เข้าถึงไม่ได้
+                            Continue For
+                        End Try
+                    Next
+
+                Catch patternEx As Exception
+                    ' ข้าม pattern ที่มีปัญหา
+                    Continue For
+                End Try
+            Next
+
+            ' ค้นหาในโฟลเดอร์ย่อย
+            Try
+                Dim subDirectories As String() = Directory.GetDirectories(directoryPath)
+
+                For Each subDir As String In subDirectories
+                    Try
+                        SearchInDirectoryRecursive(subDir, searchPatterns, result)
+                    Catch subDirEx As Exception
+                        result.ErrorDirectories.Add($"ไม่สามารถเข้าถึงโฟลเดอร์: {subDir} - {subDirEx.Message}")
+                    End Try
+                Next
+
+            Catch dirEx As Exception
+                result.ErrorDirectories.Add($"ไม่สามารถดูโฟลเดอร์ย่อยใน: {directoryPath} - {dirEx.Message}")
+            End Try
+
+        Catch ex As Exception
+            result.ErrorDirectories.Add($"ข้อผิดพลาดในโฟลเดอร์: {directoryPath} - {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' แปลง path เป็น relative path
+    ''' </summary>
+    Private Function GetRelativePath(basePath As String, fullPath As String) As String
+        Try
+            If fullPath.StartsWith(basePath, StringComparison.OrdinalIgnoreCase) Then
+                Return fullPath.Substring(basePath.Length).TrimStart("\"c)
+            End If
+            Return fullPath
+        Catch
+            Return fullPath
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' แปลงขนาดไฟล์เป็นรูปแบบที่อ่านง่าย
+    ''' </summary>
+    Private Function FormatFileSize(bytes As Long) As String
+        Try
+            Dim suffixes As String() = {"B", "KB", "MB", "GB", "TB"}
+            Dim counter As Integer = 0
+            Dim number As Decimal = bytes
+
+            While number >= 1024 AndAlso counter < suffixes.Length - 1
+                number /= 1024
+                counter += 1
+            End While
+
+            Return $"{number:N1} {suffixes(counter)}"
+        Catch
+            Return $"{bytes} B"
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' คลาสสำหรับเก็บผลลัพธ์การค้นหาไฟล์
+    ''' </summary>
+    Public Class FileSearchResult
+        Public Property FilesFound As New List(Of FileDetail)()
+        Public Property DirectoriesSearched As Integer = 0
+        Public Property ErrorDirectories As New List(Of String)()
+        Public Property SearchDuration As TimeSpan = TimeSpan.Zero
+    End Class
+
+    ''' <summary>
+    ''' คลาสสำหรับเก็บรายละเอียดไฟล์
+    ''' </summary>
+    Public Class FileDetail
+        Public Property FileName As String = ""
+        Public Property FullPath As String = ""
+        Public Property RelativePath As String = ""
+        Public Property FileSize As Long = 0
+        Public Property LastModified As DateTime = DateTime.MinValue
+    End Class
 #End Region
 
 #Region "Data Operations"
@@ -962,30 +1279,41 @@ Public Class frmHistory
     End Sub
 
     ''' <summary>
-    ''' เปิดไฟล์ด้วยโปรแกรมที่เหมาะสมพร้อมจัดการข้อผิดพลาด
+    ''' เปิดไฟล์หรือโฟลเดอร์ด้วยโปรแกรมที่เหมาะสมพร้อมจัดการข้อผิดพลาด
     ''' </summary>
     Private Sub OpenFileWithErrorHandling(filePath As String)
         Try
-            ' ตรวจสอบว่าไฟล์มีอยู่จริงหรือไม่
+            ' ตรวจสอบว่าเป็นไฟล์หรือโฟลเดอร์
             If System.IO.File.Exists(filePath) Then
                 ' วิธีที่ 1: ใช้ ProcessStartInfo เพื่อเปิดไฟล์อย่างปลอดภัย
                 Dim startInfo As New System.Diagnostics.ProcessStartInfo()
                 startInfo.FileName = filePath
                 startInfo.UseShellExecute = True
                 System.Diagnostics.Process.Start(startInfo)
+            ElseIf System.IO.Directory.Exists(filePath) Then
+                ' เปิดโฟลเดอร์โดยตรง
+                Dim startInfo As New System.Diagnostics.ProcessStartInfo()
+                startInfo.FileName = "explorer.exe"
+                startInfo.Arguments = """" & filePath & """"
+                System.Diagnostics.Process.Start(startInfo)
             Else
-                MessageBox.Show($"ไม่พบไฟล์ที่ระบุ:{vbNewLine}{filePath}",
+                MessageBox.Show($"ไม่พบไฟล์หรือโฟลเดอร์ที่ระบุ:{vbNewLine}{filePath}",
                               "ไม่พบไฟล์", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             End If
         Catch ex As Exception
-            MessageBox.Show($"ไม่สามารถเปิดไฟล์ได้:{vbNewLine}{ex.Message}",
+            MessageBox.Show($"ไม่สามารถเปิดไฟล์หรือโฟลเดอร์ได้:{vbNewLine}{ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
 
-            ' วิธีที่ 2: พยายามเปิดโฟลเดอร์และเลือกไฟล์
+            ' วิธีที่ 2: พยายามเปิดโฟลเดอร์และเลือกไฟล์ (สำหรับกรณีที่เป็นไฟล์เท่านั้น)
             Try
-                Dim explorerPath As String = System.IO.Path.GetDirectoryName(filePath)
-                If System.IO.Directory.Exists(explorerPath) Then
-                    System.Diagnostics.Process.Start("explorer.exe", "/select," & filePath)
+                If System.IO.File.Exists(filePath) Then
+                    Dim explorerPath As String = System.IO.Path.GetDirectoryName(filePath)
+                    If System.IO.Directory.Exists(explorerPath) Then
+                        System.Diagnostics.Process.Start("explorer.exe", "/select," & filePath)
+                    End If
+                ElseIf System.IO.Directory.Exists(System.IO.Path.GetDirectoryName(filePath)) Then
+                    ' ถ้าไฟล์ไม่มี แต่โฟลเดอร์พ่อแม่มี ให้เปิดโฟลเดอร์พ่อแม่
+                    System.Diagnostics.Process.Start("explorer.exe", """" & System.IO.Path.GetDirectoryName(filePath) & """")
                 End If
             Catch ex2 As Exception
                 MessageBox.Show($"ไม่สามารถเปิดโฟลเดอร์ได้:{vbNewLine}{ex2.Message}",
