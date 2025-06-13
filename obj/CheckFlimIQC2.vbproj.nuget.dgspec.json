@@ -63,6 +63,10 @@
               "target": "Package",
               "version": "[15.0.4795.1001, )"
             },
+            "System.Data.OleDb": {
+              "target": "Package",
+              "version": "[9.0.6, )"
+            },
             "System.Data.SQLite": {
               "target": "Package",
               "version": "[1.0.118, )"

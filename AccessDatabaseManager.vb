@@ -1,0 +1,639 @@
+Imports System.Data
+Imports System.Data.OleDb
+Imports System.IO
+Imports System.Xml
+Imports System.Windows.Forms
+
+
+''' <summary>
+''' คลาสสำหรับจัดการฐานข้อมูล MS Access
+''' </summary>
+Public Class AccessDatabaseManager
+
+    ' กำหนดพาธของไฟล์การตั้งค่า
+    Private Shared ReadOnly CONFIG_FILE As String = "Settings.config"
+    
+    ' กำหนดพาธของฐานข้อมูล Access
+    Private Shared _databasePath As String = Path.Combine(Application.StartupPath, "ScanData.accdb")
+    Private Shared _password As String = "" ' รหัสผ่านฐานข้อมูล (ถ้ามี)
+
+    ''' <summary>
+    ''' Connection string สำหรับเชื่อมต่อฐานข้อมูล Access
+    ''' </summary>
+    Public Shared ReadOnly Property ConnectionString As String
+        Get
+            Dim connectionStrings As String = $"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={_databasePath};"
+
+            ' เพิ่มรหัสผ่านถ้ามี
+            If Not String.IsNullOrEmpty(_password) Then
+                connectionStrings += $"Jet OLEDB:Database Password={_password};"
+            End If
+
+            Return connectionStrings
+        End Get
+    End Property
+
+    ''' <summary>
+    ''' โหลดการตั้งค่าฐานข้อมูลจากไฟล์ config
+    ''' </summary>
+    Private Shared Sub LoadDatabaseSettings()
+        Try
+            If File.Exists(CONFIG_FILE) Then
+                Dim doc As New XmlDocument()
+                doc.Load(CONFIG_FILE)
+
+                _databasePath = GetSettingValueFromXML(doc, "AccessDatabasePath", 
+                    Path.Combine(Application.StartupPath, "ScanData.accdb"))
+                _password = GetSettingValueFromXML(doc, "AccessPassword", "")
+
+                Console.WriteLine($"Access database settings loaded - Path: {_databasePath}")
+            End If
+        Catch ex As Exception
+            Console.WriteLine($"Error loading database settings: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' ดึงค่าจาก XML
+    ''' </summary>
+    Private Shared Function GetSettingValueFromXML(doc As XmlDocument, key As String, defaultValue As Object) As Object
+        Try
+            Dim node As XmlNode = doc.SelectSingleNode($"//Setting[@key='{key}']")
+            If node IsNot Nothing Then
+                Dim value As String = node.Attributes("value").Value
+
+                Select Case defaultValue.GetType()
+                    Case GetType(Boolean)
+                        Return Boolean.Parse(value)
+                    Case GetType(Integer)
+                        Return Integer.Parse(value)
+                    Case GetType(Decimal)
+                        Return Decimal.Parse(value)
+                    Case Else
+                        If key = "AccessPassword" Then
+                            Return DecryptPassword(value)
+                        End If
+                        Return value
+                End Select
+            End If
+        Catch
+        End Try
+        Return defaultValue
+    End Function
+
+    ''' <summary>
+    ''' ถอดรหัสพาสเวิร์ดแบบง่าย
+    ''' </summary>
+    Private Shared Function DecryptPassword(encryptedPassword As String) As String
+        Try
+            If String.IsNullOrEmpty(encryptedPassword) Then Return ""
+            ' การถอดรหัสแบบง่าย (จาก Base64)
+            Dim bytes As Byte() = Convert.FromBase64String(encryptedPassword)
+            Return System.Text.Encoding.UTF8.GetString(bytes)
+        Catch
+            Return encryptedPassword
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ตรวจสอบการเชื่อมต่อฐานข้อมูล
+    ''' </summary>
+    ''' <returns>True ถ้าเชื่อมต่อได้, False ถ้าเชื่อมต่อไม่ได้</returns>
+    Public Shared Function IsConnected() As Boolean
+        Try
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+                conn.Close()
+                Return True
+            End Using
+        Catch ex As Exception
+            Console.WriteLine($"Connection error: {ex.Message}")
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' เริ่มต้นการใช้งานฐานข้อมูล
+    ''' </summary>
+    ''' <returns>True ถ้าเริ่มต้นสำเร็จ, False ถ้าเริ่มต้นไม่สำเร็จ</returns>
+    Public Shared Function Initialize() As Boolean
+        Try
+            ' โหลดการตั้งค่าฐานข้อมูล
+            LoadDatabaseSettings()
+
+            ' สร้างฐานข้อมูลใหม่ถ้ายังไม่มี
+            If Not File.Exists(_databasePath) Then
+                CreateNewDatabase()
+            End If
+
+            ' สร้างตารางหากยังไม่มี
+            CreateTablesIfNotExists()
+            
+            Return IsConnected()
+        Catch ex As Exception
+            Console.WriteLine($"Error initializing database: {ex.Message}")
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' สร้างไฟล์ฐานข้อมูล Access ใหม่
+    ''' </summary>
+    Private Shared Sub CreateNewDatabase()
+        Try
+            ' สร้างโฟลเดอร์ถ้ายังไม่มี
+            Dim directory As String = Path.GetDirectoryName(_databasePath)
+            If Not IO.Directory.Exists(directory) Then
+                IO.Directory.CreateDirectory(directory)
+            End If
+
+            ' สร้างฐานข้อมูล Access ใหม่ด้วย ADOX
+            Try
+                ' วิธีที่ 1: ใช้ ADOX (แนะนำ)
+                Dim catalog As Object = CreateObject("ADOX.Catalog")
+                catalog.Create(ConnectionString)
+                catalog = Nothing
+                Console.WriteLine($"Access database created successfully: {_databasePath}")
+            Catch adoxEx As Exception
+                Console.WriteLine($"ADOX method failed: {adoxEx.Message}")
+                
+                ' วิธีที่ 2: สร้างด้วย OleDb (backup method)
+                CreateDatabaseWithOleDb()
+            End Try
+
+        Catch ex As Exception
+            Console.WriteLine($"Error creating database: {ex.Message}")
+            Throw New Exception($"ไม่สามารถสร้างฐานข้อมูล Access ได้: {ex.Message}", ex)
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' สร้างฐานข้อมูลด้วย OleDb (วิธีสำรอง)
+    ''' </summary>
+    Private Shared Sub CreateDatabaseWithOleDb()
+        Try
+            ' สร้างไฟล์ .accdb เปล่า
+            File.WriteAllBytes(_databasePath, New Byte() {})
+            
+            ' ลองเชื่อมต่อเพื่อ initialize
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+                conn.Close()
+            End Using
+            
+            Console.WriteLine($"Database created with OleDb method: {_databasePath}")
+        Catch ex As Exception
+            Console.WriteLine($"OleDb creation method also failed: {ex.Message}")
+            Throw
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' สร้างตารางในฐานข้อมูลถ้ายังไม่มี
+    ''' </summary>
+    Public Shared Sub CreateTablesIfNotExists()
+        Try
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+
+                ' ตรวจสอบว่ามีตาราง ScanRecords หรือไม่
+                Dim tableExists As Boolean = False
+                
+                Try
+                    Dim tables As DataTable = conn.GetSchema("Tables")
+                    For Each row As DataRow In tables.Rows
+                        If row("TABLE_NAME").ToString().Equals("ScanRecords", StringComparison.OrdinalIgnoreCase) Then
+                            tableExists = True
+                            Exit For
+                        End If
+                    Next
+                Catch ex As Exception
+                    Console.WriteLine($"Error checking table existence: {ex.Message}")
+                    tableExists = False
+                End Try
+
+                ' สร้างตาราง ScanRecords ถ้ายังไม่มี
+                If Not tableExists Then
+                    Dim createTableSql As String = 
+                        "CREATE TABLE ScanRecords (" &
+                        "Id AUTOINCREMENT PRIMARY KEY, " &
+                        "ScanDateTime DATETIME NOT NULL, " &
+                        "ProductCode TEXT(255), " &
+                        "ReferenceCode TEXT(255), " &
+                        "Quantity INTEGER, " &
+                        "DateCode TEXT(255), " &
+                        "IsValid YESNO, " &
+                        "OriginalData MEMO, " &
+                        "ExtractedData MEMO, " &
+                        "ValidationMessages MEMO, " &
+                        "ComputerName TEXT(255), " &
+                        "UserName TEXT(255)" &
+                        ")"
+
+                    Using createCmd As New OleDbCommand(createTableSql, conn)
+                        createCmd.ExecuteNonQuery()
+                        Console.WriteLine("ScanRecords table created successfully")
+                    End Using
+                End If
+
+                conn.Close()
+            End Using
+
+            Console.WriteLine("Tables created or already exist")
+        Catch ex As Exception
+            Console.WriteLine($"Error creating tables: {ex.Message}")
+            Throw New Exception($"ไม่สามารถสร้างตารางในฐานข้อมูลได้: {ex.Message}", ex)
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' บันทึกข้อมูลการสแกน
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกน</param>
+    ''' <returns>ID ของรายการที่บันทึก</returns>
+    Public Shared Function SaveScanData(record As ScanDataRecord) As Integer
+        Return AddScanRecord(record)
+    End Function
+
+    ''' <summary>
+    ''' เพิ่มข้อมูลการสแกนใหม่
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกน</param>
+    ''' <returns>ID ของรายการที่เพิ่ม</returns>
+    Public Shared Function AddScanRecord(record As ScanDataRecord) As Integer
+        Try
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+
+                Dim insertSql As String = 
+                    "INSERT INTO ScanRecords " &
+                    "(ScanDateTime, ProductCode, ReferenceCode, Quantity, DateCode, IsValid, " &
+                    "OriginalData, ExtractedData, ValidationMessages, ComputerName, UserName) " &
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+
+                Using insertCmd As New OleDbCommand(insertSql, conn)
+                    ' เพิ่มพารามิเตอร์ (Access ใช้ ? แทน @parameter)
+                    insertCmd.Parameters.AddWithValue("@ScanDateTime", record.ScanDateTime)
+                    insertCmd.Parameters.AddWithValue("@ProductCode", If(record.ProductCode, DBNull.Value))
+                    insertCmd.Parameters.AddWithValue("@ReferenceCode", If(record.ReferenceCode, DBNull.Value))
+                    insertCmd.Parameters.AddWithValue("@Quantity", record.Quantity)
+                    insertCmd.Parameters.AddWithValue("@DateCode", If(record.DateCode, DBNull.Value))
+                    insertCmd.Parameters.AddWithValue("@IsValid", record.IsValid)
+                    insertCmd.Parameters.AddWithValue("@OriginalData", If(record.OriginalData, DBNull.Value))
+                    insertCmd.Parameters.AddWithValue("@ExtractedData", If(record.ExtractedData, DBNull.Value))
+                    insertCmd.Parameters.AddWithValue("@ValidationMessages", If(record.ValidationMessages, DBNull.Value))
+                    insertCmd.Parameters.AddWithValue("@ComputerName", If(record.ComputerName, DBNull.Value))
+                    insertCmd.Parameters.AddWithValue("@UserName", If(record.UserName, DBNull.Value))
+
+                    insertCmd.ExecuteNonQuery()
+                End Using
+
+                ' ดึง ID ที่เพิ่มล่าสุด
+                Using idCmd As New OleDbCommand("SELECT @@IDENTITY", conn)
+                    Dim id As Integer = Convert.ToInt32(idCmd.ExecuteScalar())
+                    record.Id = id
+                    
+                    Console.WriteLine($"Added scan record with ID: {id}")
+                    Return id
+                End Using
+
+                conn.Close()
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine($"Error adding scan record: {ex.Message}")
+            Throw New Exception($"ไม่สามารถเพิ่มข้อมูลการสแกนได้: {ex.Message}", ex)
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ดึงข้อมูลประวัติการสแกนทั้งหมด
+    ''' </summary>
+    ''' <param name="limit">จำนวนรายการสูงสุดที่ต้องการดึง</param>
+    ''' <returns>รายการข้อมูลการสแกน</returns>
+    Public Shared Function GetScanHistory(Optional limit As Integer = 1000) As List(Of ScanDataRecord)
+        Try
+            Dim results As New List(Of ScanDataRecord)()
+
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+
+                ' Access ใช้ TOP แทน LIMIT
+                Dim selectSql As String = If(limit > 0, 
+                    $"SELECT TOP {limit} * FROM ScanRecords ORDER BY ScanDateTime DESC", 
+                    "SELECT * FROM ScanRecords ORDER BY ScanDateTime DESC")
+
+                Using selectCmd As New OleDbCommand(selectSql, conn)
+                    Using reader As OleDbDataReader = selectCmd.ExecuteReader()
+                        While reader.Read()
+                            Dim record As New ScanDataRecord()
+
+                            record.Id = Convert.ToInt32(reader("Id"))
+                            record.ScanDateTime = Convert.ToDateTime(reader("ScanDateTime"))
+                            record.ProductCode = If(reader("ProductCode") IsNot DBNull.Value, reader("ProductCode").ToString(), "")
+                            record.ReferenceCode = If(reader("ReferenceCode") IsNot DBNull.Value, reader("ReferenceCode").ToString(), "")
+                            record.Quantity = If(reader("Quantity") IsNot DBNull.Value, Convert.ToInt32(reader("Quantity")), 0)
+                            record.DateCode = If(reader("DateCode") IsNot DBNull.Value, reader("DateCode").ToString(), "")
+                            record.IsValid = Convert.ToBoolean(reader("IsValid"))
+                            record.OriginalData = If(reader("OriginalData") IsNot DBNull.Value, reader("OriginalData").ToString(), "")
+                            record.ExtractedData = If(reader("ExtractedData") IsNot DBNull.Value, reader("ExtractedData").ToString(), "")
+                            record.ValidationMessages = If(reader("ValidationMessages") IsNot DBNull.Value, reader("ValidationMessages").ToString(), "")
+                            record.ComputerName = If(reader("ComputerName") IsNot DBNull.Value, reader("ComputerName").ToString(), "")
+                            record.UserName = If(reader("UserName") IsNot DBNull.Value, reader("UserName").ToString(), "")
+
+                            results.Add(record)
+                        End While
+                    End Using
+                End Using
+
+                conn.Close()
+            End Using
+
+            Console.WriteLine($"Retrieved {results.Count} scan records")
+            Return results
+
+        Catch ex As Exception
+            Console.WriteLine($"Error getting scan history: {ex.Message}")
+            Throw New Exception($"ไม่สามารถดึงข้อมูลประวัติการสแกนได้: {ex.Message}", ex)
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ลบข้อมูลการสแกนตาม ID
+    ''' </summary>
+    ''' <param name="id">ID ของรายการที่ต้องการลบ</param>
+    ''' <returns>True ถ้าลบสำเร็จ, False ถ้าไม่สำเร็จ</returns>
+    Public Shared Function DeleteScanRecord(id As Integer) As Boolean
+        Try
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+
+                Using deleteCmd As New OleDbCommand("DELETE FROM ScanRecords WHERE Id = ?", conn)
+                    deleteCmd.Parameters.AddWithValue("@Id", id)
+                    Dim rowsAffected As Integer = deleteCmd.ExecuteNonQuery()
+                    
+                    Console.WriteLine($"Deleted scan record ID {id}, rows affected: {rowsAffected}")
+                    Return rowsAffected > 0
+                End Using
+
+                conn.Close()
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine($"Error deleting scan record: {ex.Message}")
+            Throw New Exception($"ไม่สามารถลบข้อมูลการสแกนได้: {ex.Message}", ex)
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' อัปเดตข้อมูลการสแกน
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกนที่อัปเดต</param>
+    ''' <returns>True ถ้าอัปเดตสำเร็จ, False ถ้าไม่สำเร็จ</returns>
+    Public Shared Function UpdateScanRecord(record As ScanDataRecord) As Boolean
+        Try
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+
+                Dim updateSql As String = 
+                    "UPDATE ScanRecords SET " &
+                    "ProductCode = ?, " &
+                    "ReferenceCode = ?, " &
+                    "Quantity = ?, " &
+                    "DateCode = ?, " &
+                    "IsValid = ?, " &
+                    "ExtractedData = ?, " &
+                    "ValidationMessages = ? " &
+                    "WHERE Id = ?"
+
+                Using updateCmd As New OleDbCommand(updateSql, conn)
+                    ' เพิ่มพารามิเตอร์
+                    updateCmd.Parameters.AddWithValue("@ProductCode", If(record.ProductCode, DBNull.Value))
+                    updateCmd.Parameters.AddWithValue("@ReferenceCode", If(record.ReferenceCode, DBNull.Value))
+                    updateCmd.Parameters.AddWithValue("@Quantity", record.Quantity)
+                    updateCmd.Parameters.AddWithValue("@DateCode", If(record.DateCode, DBNull.Value))
+                    updateCmd.Parameters.AddWithValue("@IsValid", record.IsValid)
+                    updateCmd.Parameters.AddWithValue("@ExtractedData", If(record.ExtractedData, DBNull.Value))
+                    updateCmd.Parameters.AddWithValue("@ValidationMessages", If(record.ValidationMessages, DBNull.Value))
+                    updateCmd.Parameters.AddWithValue("@Id", record.Id)
+
+                    Dim rowsAffected As Integer = updateCmd.ExecuteNonQuery()
+                    
+                    Console.WriteLine($"Updated scan record ID {record.Id}, rows affected: {rowsAffected}")
+                    Return rowsAffected > 0
+                End Using
+
+                conn.Close()
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine($"Error updating scan record: {ex.Message}")
+            Throw New Exception($"ไม่สามารถอัปเดตข้อมูลการสแกนได้: {ex.Message}", ex)
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ค้นหาข้อมูลการสแกนตามรหัสผลิตภัณฑ์
+    ''' </summary>
+    ''' <param name="productCode">รหัสผลิตภัณฑ์</param>
+    ''' <returns>รายการข้อมูลการสแกนที่ตรงกับรหัสผลิตภัณฑ์</returns>
+    Public Shared Function SearchByProductCode(productCode As String) As List(Of ScanDataRecord)
+        Try
+            Dim results As New List(Of ScanDataRecord)()
+
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+
+                ' Access ใช้ * แทน % สำหรับ wildcard
+                Using selectCmd As New OleDbCommand("SELECT * FROM ScanRecords WHERE ProductCode LIKE ? ORDER BY ScanDateTime DESC", conn)
+                    selectCmd.Parameters.AddWithValue("@ProductCode", $"*{productCode}*")
+
+                    Using reader As OleDbDataReader = selectCmd.ExecuteReader()
+                        While reader.Read()
+                            Dim record As New ScanDataRecord()
+
+                            record.Id = Convert.ToInt32(reader("Id"))
+                            record.ScanDateTime = Convert.ToDateTime(reader("ScanDateTime"))
+                            record.ProductCode = If(reader("ProductCode") IsNot DBNull.Value, reader("ProductCode").ToString(), "")
+                            record.ReferenceCode = If(reader("ReferenceCode") IsNot DBNull.Value, reader("ReferenceCode").ToString(), "")
+                            record.Quantity = If(reader("Quantity") IsNot DBNull.Value, Convert.ToInt32(reader("Quantity")), 0)
+                            record.DateCode = If(reader("DateCode") IsNot DBNull.Value, reader("DateCode").ToString(), "")
+                            record.IsValid = Convert.ToBoolean(reader("IsValid"))
+                            record.OriginalData = If(reader("OriginalData") IsNot DBNull.Value, reader("OriginalData").ToString(), "")
+                            record.ExtractedData = If(reader("ExtractedData") IsNot DBNull.Value, reader("ExtractedData").ToString(), "")
+                            record.ValidationMessages = If(reader("ValidationMessages") IsNot DBNull.Value, reader("ValidationMessages").ToString(), "")
+                            record.ComputerName = If(reader("ComputerName") IsNot DBNull.Value, reader("ComputerName").ToString(), "")
+                            record.UserName = If(reader("UserName") IsNot DBNull.Value, reader("UserName").ToString(), "")
+
+                            results.Add(record)
+                        End While
+                    End Using
+                End Using
+                
+                conn.Close()
+            End Using
+            
+            Console.WriteLine($"Found {results.Count} records for product code: {productCode}")
+            Return results
+            
+        Catch ex As Exception
+            Console.WriteLine($"Error searching by product code: {ex.Message}")
+            Throw New Exception($"ไม่สามารถค้นหาข้อมูลตามรหัสผลิตภัณฑ์ได้: {ex.Message}", ex)
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ได้รับข้อมูลสถิติการใช้งาน
+    ''' </summary>
+    ''' <returns>ข้อมูลสถิติ</returns>
+    Public Shared Function GetStatistics() As DatabaseStatistics
+        Try
+            Dim stats As New DatabaseStatistics()
+
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+
+                ' นับจำนวนรายการทั้งหมด
+                Using countCmd As New OleDbCommand("SELECT COUNT(*) FROM ScanRecords", conn)
+                    stats.TotalRecords = Convert.ToInt32(countCmd.ExecuteScalar())
+                End Using
+
+                ' นับจำนวนรายการที่ถูกต้อง
+                Using validCmd As New OleDbCommand("SELECT COUNT(*) FROM ScanRecords WHERE IsValid = True", conn)
+                    stats.ValidRecords = Convert.ToInt32(validCmd.ExecuteScalar())
+                End Using
+
+                ' นับจำนวนรายการที่ไม่ถูกต้อง
+                stats.InvalidRecords = stats.TotalRecords - stats.ValidRecords
+
+                ' หาวันที่สแกนล่าสุด
+                Using lastCmd As New OleDbCommand("SELECT MAX(ScanDateTime) FROM ScanRecords", conn)
+                    Dim lastScan = lastCmd.ExecuteScalar()
+                    If lastScan IsNot DBNull.Value Then
+                        stats.LastScanDate = Convert.ToDateTime(lastScan)
+                    End If
+                End Using
+
+                conn.Close()
+            End Using
+
+            Return stats
+
+        Catch ex As Exception
+            Console.WriteLine($"Error getting statistics: {ex.Message}")
+            Return New DatabaseStatistics()
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' สำรองข้อมูลฐานข้อมูล
+    ''' </summary>
+    ''' <param name="backupPath">พาธที่จะสำรองข้อมูล</param>
+    ''' <returns>True ถ้าสำรองสำเร็จ</returns>
+    Public Shared Function BackupDatabase(backupPath As String) As Boolean
+        Try
+            If File.Exists(_databasePath) Then
+                ' สร้างโฟลเดอร์ backup ถ้ายังไม่มี
+                Dim backupDir As String = Path.GetDirectoryName(backupPath)
+                If Not Directory.Exists(backupDir) Then
+                    Directory.CreateDirectory(backupDir)
+                End If
+
+                ' คัดลอกไฟล์ฐานข้อมูล
+                File.Copy(_databasePath, backupPath, True)
+                
+                Console.WriteLine($"Database backed up to: {backupPath}")
+                Return True
+            End If
+
+            Return False
+
+        Catch ex As Exception
+            Console.WriteLine($"Error backing up database: {ex.Message}")
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' คืนค่าฐานข้อมูลจากไฟล์สำรอง
+    ''' </summary>
+    ''' <param name="backupPath">พาธของไฟล์สำรอง</param>
+    ''' <returns>True ถ้าคืนค่าสำเร็จ</returns>
+    Public Shared Function RestoreDatabase(backupPath As String) As Boolean
+        Try
+            If File.Exists(backupPath) Then
+                ' สำรองไฟล์ปัจจุบันก่อน (ถ้ามี)
+                If File.Exists(_databasePath) Then
+                    Dim currentBackup As String = _databasePath + ".old"
+                    File.Copy(_databasePath, currentBackup, True)
+                End If
+
+                ' คัดลอกไฟล์สำรองมาแทนที่
+                File.Copy(backupPath, _databasePath, True)
+                
+                Console.WriteLine($"Database restored from: {backupPath}")
+                Return True
+            End If
+
+            Return False
+
+        Catch ex As Exception
+            Console.WriteLine($"Error restoring database: {ex.Message}")
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ทำความสะอาดข้อมูลเก่า
+    ''' </summary>
+    ''' <param name="daysOld">จำนวนวันที่จะลบข้อมูลเก่า</param>
+    ''' <returns>จำนวนรายการที่ลบ</returns>
+    Public Shared Function CleanupOldData(daysOld As Integer) As Integer
+        Try
+            Dim cutoffDate As DateTime = DateTime.Now.AddDays(-daysOld)
+
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+
+                Using deleteCmd As New OleDbCommand("DELETE FROM ScanRecords WHERE ScanDateTime < ?", conn)
+                    deleteCmd.Parameters.AddWithValue("@CutoffDate", cutoffDate)
+                    Dim deletedCount As Integer = deleteCmd.ExecuteNonQuery()
+                    
+                    Console.WriteLine($"Cleaned up {deletedCount} old records older than {daysOld} days")
+                    Return deletedCount
+                End Using
+
+                conn.Close()
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine($"Error cleaning up old data: {ex.Message}")
+            Return 0
+        End Try
+    End Function
+
+End Class
+
+''' <summary>
+''' คลาสสำหรับเก็บสถิติการใช้งานฐานข้อมูล
+''' </summary>
+Public Class DatabaseStatistics
+    Public Property TotalRecords As Integer = 0
+    Public Property ValidRecords As Integer = 0
+    Public Property InvalidRecords As Integer = 0
+    Public Property LastScanDate As DateTime = DateTime.MinValue
+    
+    Public ReadOnly Property ValidPercentage As Double
+        Get
+            If TotalRecords = 0 Then Return 0
+            Return (ValidRecords / TotalRecords) * 100
+        End Get
+    End Property
+    
+    Public ReadOnly Property InvalidPercentage As Double
+        Get
+            If TotalRecords = 0 Then Return 0
+            Return (InvalidRecords / TotalRecords) * 100
+        End Get
+    End Property
+End Class
