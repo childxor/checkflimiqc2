@@ -479,373 +479,453 @@ Public Class ExcelUtility
     End Function
 
     ''' <summary>
-    ''' ค้นหาข้อมูลใน Excel โดยใช้ ClosedXML
+    ''' ค้นหาข้อมูลใน Excel โดยใช้ ClosedXML (แบบปรับปรุงแล้ว)
     ''' </summary>
     Private Shared Function SearchUsingClosedXML(excelPath As String, productCode As String) As ExcelSearchResult
         Dim result As New ExcelSearchResult()
         result.SearchedProductCode = productCode
         result.ExcelFilePath = excelPath
 
+        ' ตรวจสอบไฟล์และ ClosedXML
+        If Not ValidateClosedXMLFile(excelPath, result) Then
+            Return result
+        End If
+
         Try
-            ' ตรวจสอบว่าไฟล์ Excel เปิดอยู่หรือไม่
-            If IsFileInUse(excelPath) Then
-                result.ErrorMessage = $"ไฟล์ Excel '{Path.GetFileName(excelPath)}' กำลังถูกใช้งานอยู่ กรุณาปิดไฟล์ก่อนค้นหา"
-                result.IsSuccess = False
-                result.SummaryMessage = $"❌ ไม่สามารถเปิดไฟล์ Excel ได้เนื่องจากไฟล์กำลังถูกใช้งาน"
-                Console.WriteLine(result.ErrorMessage)
+            ' ลองใช้วิธีตรงๆ ก่อน
+            If TryDirectClosedXML(excelPath, productCode, result) Then
                 Return result
             End If
 
-            ' ตรวจสอบว่ามี ClosedXML หรือไม่
+            ' ใช้ Reflection เป็นทางเลือกสำรอง
+            Return SearchWithReflection(excelPath, productCode)
+
+        Catch ex As Exception
+            result.ErrorMessage = $"เกิดข้อผิดพลาดในการค้นหา: {ex.Message}"
+            result.IsSuccess = False
+            Return result
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' สร้าง Workbook ด้วย Reflection
+    ''' </summary>
+    Private Shared Function CreateWorkbook(xlType As Type, excelPath As String) As Object
+        Try
+            Dim workbookConstructor = xlType.GetConstructor(New Type() {GetType(String)})
+            If workbookConstructor Is Nothing Then
+                Console.WriteLine("ไม่พบ constructor ที่เหมาะสม")
+                Return Nothing
+            End If
+
+            Return workbookConstructor.Invoke(New Object() {excelPath})
+
+        Catch ex As Exception
+            Console.WriteLine($"ไม่สามารถสร้าง Workbook ได้: {ex.Message}")
+            Return Nothing
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ค้นหาด้วย Reflection (เป็น fallback method)
+    ''' </summary>
+    Private Shared Function SearchWithReflection(excelPath As String, productCode As String) As ExcelSearchResult
+        Dim result As New ExcelSearchResult()
+        result.SearchedProductCode = productCode
+        result.ExcelFilePath = excelPath
+
+        Try
             Dim xlType = Type.GetType("ClosedXML.Excel.XLWorkbook, ClosedXML", False, True)
-            If xlType Is Nothing Then
-                result.ErrorMessage = "ไม่พบ ClosedXML ในระบบ กรุณาติดตั้ง ClosedXML ผ่าน NuGet"
+            Dim workbook = CreateWorkbook(xlType, excelPath)
+
+            If workbook Is Nothing Then
+                result.ErrorMessage = "ไม่สามารถเปิดไฟล์ Excel ได้"
                 result.IsSuccess = False
-                Console.WriteLine(result.ErrorMessage)
                 Return result
             End If
 
-            ' ใช้ Reflection เพื่อโหลดและใช้งาน ClosedXML แบบไดนามิก
+            ' ค้นหาข้อมูล
+            ProcessWorkbookWithReflection(workbook, xlType, productCode, result)
+
+            ' ปิด workbook
+            DisposeWorkbook(workbook, xlType)
+
+        Catch ex As Exception
+            result.ErrorMessage = $"เกิดข้อผิดพลาดในการค้นหา: {ex.Message}"
+            result.IsSuccess = False
+        End Try
+
+        Return result
+    End Function
+
+    ''' <summary>
+    ''' สร้าง ExcelMatchResult ด้วย Reflection
+    ''' </summary>
+    Private Shared Function CreateMatchResultWithReflection(worksheet As Object, cellMethod As System.Reflection.MethodInfo, valueProperty As System.Reflection.PropertyInfo, row As Integer, productCode As String) As ExcelMatchResult
+        Dim matchResult As New ExcelMatchResult() With {
+        .RowNumber = row,
+        .ProductCode = productCode,
+        .IsExactMatch = True
+    }
+
+        ' อ่านข้อมูลจากคอลัมน์ต่างๆ
+        For col As Integer = 1 To 6
             Try
-                Console.WriteLine($"กำลังเปิดไฟล์ Excel: {excelPath}")
+                Dim cell = cellMethod.Invoke(worksheet, New Object() {row, col})
+                If cell IsNot Nothing Then
+                    Dim cellValue = valueProperty.GetValue(cell)
+                    If cellValue IsNot Nothing Then
+                        Dim value As String = cellValue.ToString().Trim()
 
-                ' ลองใช้วิธีตรงๆ โดยไม่ผ่าน Reflection ก่อน (ถ้ามีการติดตั้ง ClosedXML แล้ว)
+                        Select Case col
+                            Case 1 : matchResult.Column1Value = value
+                            Case 2 : matchResult.Column2Value = value
+                            Case 4 : matchResult.Column4Value = value
+                            Case 5 : matchResult.Column5Value = value
+                            Case 6 : matchResult.Column6Value = value
+                        End Select
+                    End If
+                End If
+            Catch ex As Exception
+                ' ข้ามคอลัมน์ที่มีปัญหา
+                Continue For
+            End Try
+        Next
+
+        Return matchResult
+    End Function
+
+    ''' <summary>
+    ''' ตรวจสอบไฟล์และ ClosedXML
+    ''' </summary>
+    Private Shared Function ValidateClosedXMLFile(excelPath As String, result As ExcelSearchResult) As Boolean
+        ' ตรวจสอบว่าไฟล์ Excel เปิดอยู่หรือไม่
+        If IsFileInUse(excelPath) Then
+            result.ErrorMessage = $"ไฟล์ Excel '{Path.GetFileName(excelPath)}' กำลังถูกใช้งานอยู่"
+            result.IsSuccess = False
+            result.SummaryMessage = "❌ ไม่สามารถเปิดไฟล์ Excel ได้เนื่องจากไฟล์กำลังถูกใช้งาน"
+            Return False
+        End If
+
+        ' ตรวจสอบว่ามี ClosedXML หรือไม่
+        If Not IsClosedXMLAvailable() Then
+            result.ErrorMessage = "ไม่พบ ClosedXML ในระบบ กรุณาติดตั้ง ClosedXML ผ่าน NuGet"
+            result.IsSuccess = False
+            Return False
+        End If
+
+        Return True
+    End Function
+
+    ''' <summary>
+    ''' ปิด Workbook
+    ''' </summary>
+    Private Shared Sub DisposeWorkbook(workbook As Object, xlType As Type)
+        Try
+            Dim disposeMethod = xlType.GetMethod("Dispose")
+            If disposeMethod IsNot Nothing Then
+                disposeMethod.Invoke(workbook, Nothing)
+                Console.WriteLine("ปิดไฟล์ Excel เรียบร้อยแล้ว")
+            End If
+        Catch ex As Exception
+            Console.WriteLine($"Warning: ไม่สามารถปิดไฟล์ Excel ได้: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' ประมวลผลแต่ละแถว
+    ''' </summary>
+    Private Shared Function ProcessRow(worksheet As Object, cellMethod As System.Reflection.MethodInfo, row As Integer, productCode As String, searchResults As List(Of ExcelMatchResult)) As Boolean
+        Try
+            ' อ่านค่าจากคอลัมน์ที่ต้องการค้นหา
+            Dim cell = cellMethod.Invoke(worksheet, New Object() {row, PRODUCT_CODE_COLUMN})
+            If cell Is Nothing Then
+                Return False
+            End If
+
+            Dim valueProperty = cell.GetType().GetProperty("Value")
+            Dim cellValue = valueProperty.GetValue(cell)
+
+            If cellValue IsNot Nothing Then
+                Dim cellText As String = cellValue.ToString().Trim()
+
+                ' ตรวจสอบการแมทช์
+                If IsProductCodeMatch(cellText, productCode) Then
+                    Dim matchResult = CreateMatchResultWithReflection(worksheet, cellMethod, valueProperty, row, cellText)
+                    searchResults.Add(matchResult)
+                    Console.WriteLine($"พบรหัส {cellText} ที่แถว {row}")
+                    Return True
+                End If
+            End If
+
+            Return False
+
+        Catch ex As Exception
+            Console.WriteLine($"ข้อผิดพลาดในการอ่านแถว {row}: {ex.Message}")
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ค้นหาข้อมูลใน Worksheet ด้วย Reflection
+    ''' </summary>
+    Private Shared Sub SearchInWorksheetWithReflection(worksheet As Object, productCode As String, result As ExcelSearchResult, rowCount As Integer)
+        Try
+            Dim cellMethod = worksheet.GetType().GetMethod("Cell", New Type() {GetType(Integer), GetType(Integer)})
+            Dim searchResults As New List(Of ExcelMatchResult)()
+
+            For row As Integer = 1 To rowCount
                 Try
-                    ' ตรวจสอบว่ามีการติดตั้ง ClosedXML แล้วหรือไม่
-                    Dim assembly = System.Reflection.Assembly.Load("ClosedXML")
-                    If assembly IsNot Nothing Then
-                        Console.WriteLine("พบ ClosedXML Assembly แล้ว ใช้วิธีตรงๆ")
-
-                        ' ต้องมีการเพิ่ม Reference ถึง ClosedXML ในโปรเจ็คก่อน
-                        ' ถ้ายังไม่ได้เพิ่ม โค้ดส่วนนี้จะไม่ทำงาน และจะไปใช้ Code Block ถัดไปแทน
-
-                        ' Using workbook = New ClosedXML.Excel.XLWorkbook(excelPath)
-                        '     Dim worksheet = workbook.Worksheet(1)
-                        '     
-                        '     ' หาแถวสุดท้ายที่มีข้อมูล
-                        '     Dim lastRow = worksheet.LastRowUsed().RowNumber()
-                        '     Dim maxRows = 10000 ' จำกัดจำนวนแถวที่ค้นหา
-                        '     Dim rowCount = Math.Min(lastRow, maxRows)
-                        '     
-                        '     Dim searchResults As New List(Of ExcelMatchResult)()
-                        '     
-                        '     ' วนลูปค้นหาในแต่ละแถว
-                        '     For row As Integer = 1 To rowCount
-                        '         Dim cellValue = worksheet.Cell(row, PRODUCT_CODE_COLUMN).Value
-                        '         
-                        '         If cellValue IsNot Nothing Then
-                        '             Dim cellText As String = cellValue.ToString().Trim()
-                        '             
-                        '             ' ตรวจสอบการแมทช์
-                        '             If IsProductCodeMatch(cellText, productCode) Then
-                        '                 ' สร้าง matchResult และอ่านข้อมูลจากคอลัมน์อื่นๆ
-                        '                 ' ... (โค้ดเหมือนกับในเวอร์ชันที่ใช้ Reflection)
-                        '             End If
-                        '         End If
-                        '     Next
-                        '     
-                        '     ' กำหนดผลลัพธ์
-                        '     ' ... (โค้ดเหมือนกับในเวอร์ชันที่ใช้ Reflection)
-                        ' End Using
+                    If ProcessRow(worksheet, cellMethod, row, productCode, searchResults) Then
+                        ' หยุดค้นหาเมื่อพบครบ 10 รายการ
+                        If searchResults.Count >= 10 Then
+                            Exit For
+                        End If
                     End If
                 Catch ex As Exception
-                    Console.WriteLine($"ไม่สามารถใช้วิธีตรงๆ ได้: {ex.Message}")
+                    ' ข้ามแถวที่มีปัญหา
+                    Continue For
                 End Try
+            Next
 
-                ' ถ้าใช้วิธีตรงๆ ไม่ได้ ให้ลองใช้ Reflection
-                Console.WriteLine("ลองใช้ Reflection เพื่อเข้าถึง ClosedXML")
+            ' กำหนดผลลัพธ์
+            SetSearchResults(result, searchResults)
 
-                ' สร้าง Assembly Resolver สำหรับโหลด Assembly ที่เกี่ยวข้อง
-                Dim currentDomain = AppDomain.CurrentDomain
-                AddHandler currentDomain.AssemblyResolve, Function(sender, args)
-                                                              If args.Name.StartsWith("ClosedXML") Then
-                                                                  Return xlType.Assembly
-                                                              End If
+        Catch ex As Exception
+            result.ErrorMessage = $"เกิดข้อผิดพลาดในการค้นหา: {ex.Message}"
+            result.IsSuccess = False
+        End Try
+    End Sub
 
-                                                              ' ทดลองโหลดจาก DLL ใน bin directory
-                                                              Dim appPath = Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location)
-                                                              Dim assemblyName = New System.Reflection.AssemblyName(args.Name).Name
-                                                              Dim dllPath = Path.Combine(appPath, $"{assemblyName}.dll")
+    ''' <summary>
+    ''' หาจำนวนแถวที่มีข้อมูลสำหรับ ClosedXML
+    ''' </summary>
+    Private Shared Function GetRowCount(worksheet As Object) As Integer
+        Try
+            Console.WriteLine("กำลังหาจำนวนแถวที่มีข้อมูล...")
 
-                                                              If File.Exists(dllPath) Then
-                                                                  Return System.Reflection.Assembly.LoadFrom(dllPath)
-                                                              End If
-
-                                                              Return Nothing
-                                                          End Function
-
-                ' สร้าง XLWorkbook instance ผ่าน Reflection
-                Dim workbookConstructor = xlType.GetConstructor(New Type() {GetType(String)})
-                If workbookConstructor Is Nothing Then
-                    Throw New Exception("ไม่พบ constructor ที่เหมาะสมสำหรับ XLWorkbook")
-                End If
-
-                Console.WriteLine("กำลังเรียก XLWorkbook constructor")
-                Dim workbook = Nothing
-
+            ' วิธีที่ 1: ใช้ LastRowUsed().RowNumber()
+            Dim lastRowUsedMethod = worksheet.GetType().GetMethod("LastRowUsed", Type.EmptyTypes)
+            If lastRowUsedMethod IsNot Nothing Then
                 Try
-                    workbook = workbookConstructor.Invoke(New Object() {excelPath})
-                Catch invokeEx As System.Reflection.TargetInvocationException
-                    If invokeEx.InnerException IsNot Nothing Then
-                        If TypeOf invokeEx.InnerException Is IOException Then
-                            result.ErrorMessage = $"ไม่สามารถเข้าถึงไฟล์ Excel ได้: {invokeEx.InnerException.Message}"
-                        Else
-                            result.ErrorMessage = $"เกิดข้อผิดพลาดขณะเปิดไฟล์ Excel: {invokeEx.InnerException.Message}"
+                    Dim lastRowUsed = lastRowUsedMethod.Invoke(worksheet, Nothing)
+                    If lastRowUsed IsNot Nothing Then
+                        Dim rowNumberMethod = lastRowUsed.GetType().GetMethod("RowNumber", Type.EmptyTypes)
+                        If rowNumberMethod IsNot Nothing Then
+                            Dim lastRowNumber = Convert.ToInt32(rowNumberMethod.Invoke(lastRowUsed, Nothing))
+                            Console.WriteLine($"พบข้อมูลทั้งหมด {lastRowNumber} แถว (วิธี LastRowUsed)")
+                            Return Math.Min(lastRowNumber, MAX_SEARCH_ROWS)
                         End If
-                        result.IsSuccess = False
-                        Console.WriteLine(result.ErrorMessage)
-                        Return result
-                    Else
-                        Throw ' ส่งต่อข้อผิดพลาดถ้าไม่มี InnerException
                     End If
+                Catch ex As Exception
+                    Console.WriteLine($"วิธี LastRowUsed ไม่สำเร็จ: {ex.Message}")
                 End Try
+            End If
 
-                If workbook Is Nothing Then
-                    Throw New Exception("ไม่สามารถสร้าง XLWorkbook ได้") 
-                End If
-
-                Console.WriteLine("เปิดไฟล์ Excel สำเร็จแล้ว กำลังอ่านข้อมูล")
-
-                ' เข้าถึง Worksheet แรก
-                Dim worksheetMethod = xlType.GetMethod("Worksheet", New Type() {GetType(Integer)})
-                Dim worksheet = worksheetMethod.Invoke(workbook, New Object() {1})
-
-                ' หาจำนวนแถวที่มีข้อมูล
-                Dim lastRowNumber As Integer = 0
+            ' วิธีที่ 2: ใช้ LastCellUsed().Address
+            Dim lastCellUsedMethod = worksheet.GetType().GetMethod("LastCellUsed", Type.EmptyTypes)
+            If lastCellUsedMethod IsNot Nothing Then
                 Try
-                    ' วิธีที่ 1: ใช้ LastRowUsed
-                    Dim lastRowUsedMethod = worksheet.GetType().GetMethod("LastRowUsed")
-                    If lastRowUsedMethod IsNot Nothing Then
-                        Dim lastRowUsed = lastRowUsedMethod.Invoke(worksheet, Nothing)
-                        Dim rowNumberProperty = lastRowUsed.GetType().GetProperty("RowNumber")
-                        lastRowNumber = Convert.ToInt32(rowNumberProperty.GetValue(lastRowUsed))
-                        Console.WriteLine($"พบข้อมูลทั้งหมด {lastRowNumber} แถว (จากเมธอด LastRowUsed)")
-                    Else
-                        ' วิธีที่ 2: ใช้ LastCellUsed
-                        Dim lastCellUsedMethod = worksheet.GetType().GetMethod("LastCellUsed")
-                        If lastCellUsedMethod IsNot Nothing Then
-                            Dim lastCellUsed = lastCellUsedMethod.Invoke(worksheet, Nothing)
-                            Dim addressProperty = lastCellUsed.GetType().GetProperty("Address")
-                            Dim address = addressProperty.GetValue(lastCellUsed).ToString()
-
-                            ' แยก Row จาก Address (เช่น "A1" หรือ "B5")
-                            Dim rowMatch = System.Text.RegularExpressions.Regex.Match(address, "[A-Z]+(\d+)")
-                            If rowMatch.Success AndAlso rowMatch.Groups.Count > 1 Then
-                                lastRowNumber = Integer.Parse(rowMatch.Groups(1).Value)
-                                Console.WriteLine($"พบข้อมูลทั้งหมด {lastRowNumber} แถว (จากเมธอด LastCellUsed)")
+                    Dim lastCellUsed = lastCellUsedMethod.Invoke(worksheet, Nothing)
+                    If lastCellUsed IsNot Nothing Then
+                        Dim addressProperty = lastCellUsed.GetType().GetProperty("Address")
+                        If addressProperty IsNot Nothing Then
+                            Dim address = addressProperty.GetValue(lastCellUsed)?.ToString()
+                            If Not String.IsNullOrEmpty(address) Then
+                                ' แยก Row จาก Address (เช่น "A1" หรือ "B5" -> "1", "5")
+                                Dim rowMatch = System.Text.RegularExpressions.Regex.Match(address, "([A-Z]+)(\d+)")
+                                If rowMatch.Success AndAlso rowMatch.Groups.Count > 2 Then
+                                    Dim lastRowNumber = Integer.Parse(rowMatch.Groups(2).Value)
+                                    Console.WriteLine($"พบข้อมูลทั้งหมด {lastRowNumber} แถว (วิธี LastCellUsed)")
+                                    Return Math.Min(lastRowNumber, MAX_SEARCH_ROWS)
+                                End If
                             End If
                         End If
                     End If
                 Catch ex As Exception
-                    Console.WriteLine($"ไม่สามารถหาจำนวนแถวที่มีข้อมูลได้: {ex.Message}")
+                    Console.WriteLine($"วิธี LastCellUsed ไม่สำเร็จ: {ex.Message}")
                 End Try
+            End If
 
-                ' ถ้าไม่สามารถหาจำนวนแถวได้ ให้ใช้ค่าที่กำหนดไว้ล่วงหน้า
-                If lastRowNumber <= 0 Then
-                    lastRowNumber = 1000
-                    Console.WriteLine($"ใช้จำนวนแถวที่กำหนดไว้ล่วงหน้า: {lastRowNumber} แถว")
-                End If
-
-                Dim maxRows = 10000 ' จำกัดจำนวนแถวที่ค้นหา
-                Dim rowCount = Math.Min(lastRowNumber, maxRows)
-
-                Console.WriteLine($"จะทำการค้นหาใน {rowCount} แถว")
-
-                ' ดึงเมธอด Cell และคุณสมบัติ Value
-                Dim cellMethod As System.Reflection.MethodInfo = Nothing
-                Dim valueProperty As System.Reflection.PropertyInfo = Nothing
-
+            ' วิธีที่ 3: ใช้ RangeUsed
+            Dim rangeUsedMethod = worksheet.GetType().GetMethod("RangeUsed", Type.EmptyTypes)
+            If rangeUsedMethod IsNot Nothing Then
                 Try
-                    ' ทดลองดึงเมธอด Cell(row, column)
-                    cellMethod = worksheet.GetType().GetMethod("Cell", New Type() {GetType(Integer), GetType(Integer)})
-
-                    ' ตรวจสอบว่าได้เมธอด Cell หรือไม่
-                    If cellMethod Is Nothing Then
-                        Throw New Exception("ไม่พบเมธอด Cell ใน worksheet")
-                    End If
-
-                    ' ทดลองเรียกใช้เมธอด Cell กับแถวและคอลัมน์แรก
-                    Dim cell = cellMethod.Invoke(worksheet, New Object() {1, 1})
-
-                    ' ตรวจสอบว่าได้อ็อบเจ็กต์ cell หรือไม่
-                    If cell Is Nothing Then
-                        Throw New Exception("เมธอด Cell คืนค่า null")
-                    End If
-
-                    ' ดึงคุณสมบัติ Value จาก cell
-                    valueProperty = cell.GetType().GetProperty("Value")
-
-                    ' ตรวจสอบว่าได้คุณสมบัติ Value หรือไม่
-                    If valueProperty Is Nothing Then
-                        Throw New Exception("ไม่พบคุณสมบัติ Value ใน cell")
+                    Dim rangeUsed = rangeUsedMethod.Invoke(worksheet, Nothing)
+                    If rangeUsed IsNot Nothing Then
+                        ' หา LastRow จาก RangeUsed
+                        Dim lastRowProperty = rangeUsed.GetType().GetProperty("LastRow")
+                        If lastRowProperty IsNot Nothing Then
+                            Dim lastRowObj = lastRowProperty.GetValue(rangeUsed)
+                            If lastRowObj IsNot Nothing Then
+                                Dim rowNumberProperty = lastRowObj.GetType().GetProperty("RowNumber")
+                                If rowNumberProperty IsNot Nothing Then
+                                    Dim lastRowNumber = Convert.ToInt32(rowNumberProperty.GetValue(lastRowObj))
+                                    Console.WriteLine($"พบข้อมูลทั้งหมด {lastRowNumber} แถว (วิธี RangeUsed)")
+                                    Return Math.Min(lastRowNumber, MAX_SEARCH_ROWS)
+                                End If
+                            End If
+                        End If
                     End If
                 Catch ex As Exception
-                    Console.WriteLine($"ไม่สามารถเข้าถึงเมธอดหรือคุณสมบัติที่จำเป็น: {ex.Message}")
-                    result.ErrorMessage = $"ไม่สามารถอ่านข้อมูลจาก Excel ได้: {ex.Message}"
-                    result.IsSuccess = False
-                    Return result
+                    Console.WriteLine($"วิธี RangeUsed ไม่สำเร็จ: {ex.Message}")
                 End Try
+            End If
 
-                Dim searchResults As New List(Of ExcelMatchResult)()
+            ' วิธีที่ 4: ค้นหาแถวสุดท้ายโดยการสแกน
+            Console.WriteLine("ใช้วิธีสแกนแถวเพื่อหาข้อมูล...")
+            Return ScanForLastRow(worksheet)
 
-                ' วนลูปค้นหาในแต่ละแถว
-                For row As Integer = 1 To rowCount
-                    Try
-                        ' อ่านค่าจากคอลัมน์ที่ต้องการค้นหา (PRODUCT_CODE_COLUMN)
-                        Dim cell = cellMethod.Invoke(worksheet, New Object() {row, PRODUCT_CODE_COLUMN})
+        Catch ex As Exception
+            Console.WriteLine($"เกิดข้อผิดพลาดในการหาจำนวนแถว: {ex.Message}")
+            Console.WriteLine($"StackTrace: {ex.StackTrace}")
+            Return 1000 ' ใช้ค่าเริ่มต้น
+        End Try
+    End Function
 
-                        ' ตรวจสอบว่าได้อ็อบเจ็กต์ cell หรือไม่
-                        If cell Is Nothing Then
-                            Continue For
-                        End If
+    ''' <summary>
+    ''' สแกนหาแถวสุดท้ายที่มีข้อมูลโดยการตรวจสอบทีละแถว
+    ''' </summary>
+    Private Shared Function ScanForLastRow(worksheet As Object) As Integer
+        Try
+            Dim cellMethod = worksheet.GetType().GetMethod("Cell", New Type() {GetType(Integer), GetType(Integer)})
+            If cellMethod Is Nothing Then
+                Console.WriteLine("ไม่พบเมธอด Cell")
+                Return 1000
+            End If
 
-                        Dim cellValue = valueProperty.GetValue(cell)
+            Dim lastRowWithData As Integer = 0
+            Dim maxScanRows As Integer = 5000 ' จำกัดการสแกนไม่เกิน 5000 แถว
 
-                        If cellValue IsNot Nothing Then
-                            Dim cellText As String = cellValue.ToString().Trim()
+            Console.WriteLine($"เริ่มสแกนหาข้อมูลใน {maxScanRows} แถวแรก...")
 
-                            ' ตรวจสอบการแมทช์
-                            If IsProductCodeMatch(cellText, productCode) Then
-                                Dim matchResult As New ExcelMatchResult() With {
-                                    .RowNumber = row,
-                                    .ProductCode = cellText,
-                                    .IsExactMatch = cellText.Equals(productCode, StringComparison.OrdinalIgnoreCase)
-                                }
+            ' สแกนทุก 100 แถว เพื่อหาช่วงที่มีข้อมูล
+            For scanRow As Integer = 100 To maxScanRows Step 100
+                Try
+                    Dim hasDataInRange As Boolean = False
 
-                                ' อ่านข้อมูลจากคอลัมน์อื่นๆ
-                                Try
-                                    ' อ่านคอลัมน์ที่ 1
-                                    Try
-                                        Dim cell1 = cellMethod.Invoke(worksheet, New Object() {row, 1})
-                                        Dim cell1Value = valueProperty.GetValue(cell1)
-                                        If cell1Value IsNot Nothing Then
-                                            matchResult.Column1Value = cell1Value.ToString()
-                                        End If
-                                    Catch ex As Exception
-                                        Console.WriteLine($"ไม่สามารถอ่านคอลัมน์ 1 ที่แถว {row}: {ex.Message}")
-                                    End Try
-
-                                    ' อ่านคอลัมน์ที่ 2
-                                    Try
-                                        Dim cell2 = cellMethod.Invoke(worksheet, New Object() {row, 2})
-                                        Dim cell2Value = valueProperty.GetValue(cell2)
-                                        If cell2Value IsNot Nothing Then
-                                            matchResult.Column2Value = cell2Value.ToString()
-                                        End If
-                                    Catch ex As Exception
-                                        Console.WriteLine($"ไม่สามารถอ่านคอลัมน์ 2 ที่แถว {row}: {ex.Message}")
-                                    End Try
-
-                                    ' อ่านคอลัมน์ที่ 4 (RESULT_COLUMN)
-                                    Try
-                                        Dim cell4 = cellMethod.Invoke(worksheet, New Object() {row, RESULT_COLUMN})
-                                        Dim cell4Value = valueProperty.GetValue(cell4)
-                                        If cell4Value IsNot Nothing Then
-                                            matchResult.Column4Value = cell4Value.ToString()
-                                        End If
-                                    Catch ex As Exception
-                                        Console.WriteLine($"ไม่สามารถอ่านคอลัมน์ {RESULT_COLUMN} ที่แถว {row}: {ex.Message}")
-                                    End Try
-
-                                    ' อ่านคอลัมน์ที่ 5 (ถ้ามี)
-                                    Try
-                                        If RESULT_COLUMN + 1 <= 8 Then ' ตรวจสอบว่ามีคอลัมน์ 5 หรือไม่
-                                            Dim cell5 = cellMethod.Invoke(worksheet, New Object() {row, RESULT_COLUMN + 1})
-                                            Dim cell5Value = valueProperty.GetValue(cell5)
-                                            If cell5Value IsNot Nothing Then
-                                                matchResult.Column5Value = cell5Value.ToString()
-                                            End If
-                                        End If
-                                    Catch ex As Exception
-                                        Console.WriteLine($"ไม่สามารถอ่านคอลัมน์ {RESULT_COLUMN + 1} ที่แถว {row}: {ex.Message}")
-                                    End Try
-
-                                    ' อ่านคอลัมน์ที่ 6 (ถ้ามี)
-                                    Try
-                                        If RESULT_COLUMN + 2 <= 8 Then ' ตรวจสอบว่ามีคอลัมน์ 6 หรือไม่
-                                            Dim cell6 = cellMethod.Invoke(worksheet, New Object() {row, RESULT_COLUMN + 2})
-                                            Dim cell6Value = valueProperty.GetValue(cell6)
-                                            If cell6Value IsNot Nothing Then
-                                                matchResult.Column6Value = cell6Value.ToString()
-                                            End If
-                                        End If
-                                    Catch ex As Exception
-                                        Console.WriteLine($"ไม่สามารถอ่านคอลัมน์ {RESULT_COLUMN + 2} ที่แถว {row}: {ex.Message}")
-                                    End Try
-
-                                Catch ex As Exception
-                                    Console.WriteLine($"ข้อผิดพลาดในการอ่านคอลัมน์เพิ่มเติมที่แถว {row}: {ex.Message}")
-                                End Try
-
-                                searchResults.Add(matchResult)
-                                Console.WriteLine($"พบรหัส {cellText} ที่แถว {row}")
-
-                                ' หยุดค้นหาเมื่อพบครบ 10 รายการ
-                                If searchResults.Count >= 10 Then
+                    ' ตรวจสอบ 5 คอลัมน์แรกในแถวนี้
+                    For col As Integer = 1 To 5
+                        Dim cell = cellMethod.Invoke(worksheet, New Object() {scanRow, col})
+                        If cell IsNot Nothing Then
+                            Dim valueProperty = cell.GetType().GetProperty("Value")
+                            If valueProperty IsNot Nothing Then
+                                Dim cellValue = valueProperty.GetValue(cell)
+                                If cellValue IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(cellValue.ToString()) Then
+                                    hasDataInRange = True
+                                    lastRowWithData = scanRow
                                     Exit For
                                 End If
                             End If
                         End If
+                    Next
+
+                    ' ถ้าไม่มีข้อมูลในช่วงนี้ ให้หยุดสแกน
+                    If Not hasDataInRange AndAlso lastRowWithData > 0 Then
+                        Exit For
+                    End If
+
+                Catch ex As Exception
+                    Console.WriteLine($"ข้อผิดพลาดในการสแกนแถว {scanRow}: {ex.Message}")
+                    Continue For
+                End Try
+            Next
+
+            ' ถ้าพบข้อมูล ให้สแกนย้อนกลับเพื่อหาแถวสุดท้ายที่มีข้อมูลจริง
+            If lastRowWithData > 0 Then
+                Console.WriteLine($"พบข้อมูลล่าสุดประมาณแถว {lastRowWithData}, กำลังสแกนย้อนกลับ...")
+
+                For scanRow As Integer = lastRowWithData To Math.Max(1, lastRowWithData - 200) Step -1
+                    Try
+                        Dim hasData As Boolean = False
+
+                        ' ตรวจสอบทุกคอลัมน์ในแถวนี้
+                        For col As Integer = 1 To 10
+                            Dim cell = cellMethod.Invoke(worksheet, New Object() {scanRow, col})
+                            If cell IsNot Nothing Then
+                                Dim valueProperty = cell.GetType().GetProperty("Value")
+                                If valueProperty IsNot Nothing Then
+                                    Dim cellValue = valueProperty.GetValue(cell)
+                                    If cellValue IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(cellValue.ToString()) Then
+                                        hasData = True
+                                        lastRowWithData = scanRow
+                                        Exit For
+                                    End If
+                                End If
+                            End If
+                        Next
+
+                        ' ถ้าพบข้อมูลในแถวนี้ ให้หยุดสแกน
+                        If hasData Then
+                            Exit For
+                        End If
+
                     Catch ex As Exception
-                        Console.WriteLine($"ข้อผิดพลาดในการอ่านแถว {row}: {ex.Message}")
-                        ' ข้ามแถวที่มีปัญหาและดำเนินการต่อ
                         Continue For
                     End Try
                 Next
+            End If
 
-                ' กำหนดผลลัพธ์
-                If searchResults.Count > 0 Then
-                    result.Matches = searchResults
-                    result.FirstMatch = searchResults(0)
-                    result.MatchCount = searchResults.Count
-                    result.IsSuccess = True
-
-                    If searchResults.Count = 1 Then
-                        result.SummaryMessage = $"✅ พบรหัสผลิตภัณฑ์ '{productCode}' ที่แถว {searchResults(0).RowNumber}" & vbNewLine &
-                                               $"ข้อมูลคอลัมน์ที่ 4: {searchResults(0).Column4Value}"
-                    Else
-                        result.SummaryMessage = $"✅ พบรหัสผลิตภัณฑ์ '{productCode}' จำนวน {searchResults.Count} รายการ"
-                    End If
-                Else
-                    result.IsSuccess = False
-                    result.MatchCount = 0
-                    result.SummaryMessage = $"❌ ไม่พบรหัสผลิตภัณฑ์ '{productCode}' ในไฟล์ Excel"
-                End If
-
-                ' ปิด workbook
-                Try
-                    Dim disposeMethod = xlType.GetMethod("Dispose")
-                    disposeMethod.Invoke(workbook, Nothing)
-                    Console.WriteLine("ปิดไฟล์ Excel เรียบร้อยแล้ว")
-                Catch ex As Exception
-                    Console.WriteLine($"Warning: ไม่สามารถปิดไฟล์ Excel ได้ อาจเกิดการรั่วไหลของหน่วยความจำ: {ex.Message}")
-                End Try
-
-                Return result
-
-            Catch refEx As Exception
-                Console.WriteLine($"เกิดข้อผิดพลาดในการใช้ Reflection กับ ClosedXML: {refEx.Message}")
-                Console.WriteLine($"StackTrace: {refEx.StackTrace}")
-
-                ' สร้างข้อความแสดงข้อผิดพลาดที่เข้าใจง่าย
-                If refEx.InnerException IsNot Nothing Then
-                    result.ErrorMessage = $"เกิดข้อผิดพลาดในการอ่านไฟล์ Excel: {refEx.InnerException.Message}"
-                Else
-                    result.ErrorMessage = $"เกิดข้อผิดพลาดในการอ่านไฟล์ Excel: {refEx.Message}"
-                End If
-
-                result.IsSuccess = False
-                result.SummaryMessage = $"❌ ไม่สามารถอ่านไฟล์ Excel ได้: {Path.GetFileName(excelPath)}"
-                Return result
-            End Try
+            If lastRowWithData > 0 Then
+                Console.WriteLine($"พบข้อมูลทั้งหมด {lastRowWithData} แถว (วิธีสแกน)")
+                Return Math.Min(lastRowWithData, MAX_SEARCH_ROWS)
+            Else
+                Console.WriteLine("ไม่พบข้อมูลในไฟล์ ใช้ค่าเริ่มต้น 1000 แถว")
+                Return 1000
+            End If
 
         Catch ex As Exception
-            result.IsSuccess = False
-            result.ErrorMessage = $"เกิดข้อผิดพลาดในการค้นหาด้วย ClosedXML: {ex.Message}"
-            Console.WriteLine($"Error in SearchUsingClosedXML: {ex.Message}")
+            Console.WriteLine($"เกิดข้อผิดพลาดในการสแกน: {ex.Message}")
+            Return 1000
         End Try
+    End Function
 
-        Return result
+    ''' <summary>
+    ''' ประมวลผล Worksheet ด้วย Reflection
+    ''' </summary>
+    Private Shared Sub ProcessWorkbookWithReflection(workbook As Object, xlType As Type, productCode As String, result As ExcelSearchResult)
+        Try
+            ' เข้าถึง Worksheet แรก
+            Dim worksheetMethod = xlType.GetMethod("Worksheet", New Type() {GetType(Integer)})
+            Dim worksheet = worksheetMethod.Invoke(workbook, New Object() {1})
+
+            ' หาจำนวนแถว
+            Dim rowCount = GetRowCount(worksheet)
+            Console.WriteLine($"จะทำการค้นหาใน {rowCount} แถว")
+
+            ' ค้นหาข้อมูล
+            SearchInWorksheetWithReflection(worksheet, productCode, result, rowCount)
+
+        Catch ex As Exception
+            result.ErrorMessage = $"เกิดข้อผิดพลาดในการประมวลผล: {ex.Message}"
+            result.IsSuccess = False
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' ลองใช้ ClosedXML แบบตรงๆ (ต้องมี Reference ไปที่ ClosedXML)
+    ''' </summary>
+    Private Shared Function TryDirectClosedXML(excelPath As String, productCode As String, result As ExcelSearchResult) As Boolean
+        Try
+            ' ลองโหลด Assembly
+            Dim assembly = System.Reflection.Assembly.Load("ClosedXML")
+            If assembly Is Nothing Then
+                Return False
+            End If
+
+            Console.WriteLine("ใช้ ClosedXML แบบตรงๆ")
+
+            ' หากได้เพิ่ม Reference แล้ว สามารถใช้โค้ดนี้ได้:
+            ' Using workbook = New ClosedXML.Excel.XLWorkbook(excelPath)
+            '     ProcessWorkbook(workbook, productCode, result)
+            ' End Using
+
+            Return False ' คืนค่า False เพื่อให้ไปใช้ Reflection แทน
+
+        Catch ex As Exception
+            Console.WriteLine($"ไม่สามารถใช้วิธีตรงๆ ได้: {ex.Message}")
+            Return False
+        End Try
     End Function
 
     ''' <summary>
