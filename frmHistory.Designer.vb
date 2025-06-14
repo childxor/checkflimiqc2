@@ -49,6 +49,7 @@ Partial Class frmHistory
         Me.toolStripProgressBar = New System.Windows.Forms.ToolStripProgressBar()
         Me.saveFileDialog = New System.Windows.Forms.SaveFileDialog()
         Me.openFileDialog = New System.Windows.Forms.OpenFileDialog()
+        Me.btnSettings = New System.Windows.Forms.Button()
 
         Me.pnlHeader.SuspendLayout()
         CType(Me.picIcon, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -267,6 +268,7 @@ Partial Class frmHistory
         Me.pnlButtons.Controls.Add(Me.btnDelete)
         Me.pnlButtons.Controls.Add(Me.btnExport)
         Me.pnlButtons.Controls.Add(Me.btnExportExcel)
+        Me.pnlButtons.Controls.Add(Me.btnSettings)
         Me.pnlButtons.Controls.Add(Me.btnClose)
         Me.pnlButtons.Dock = System.Windows.Forms.DockStyle.Bottom
         Me.pnlButtons.Location = New System.Drawing.Point(0, 560)
@@ -336,6 +338,21 @@ Partial Class frmHistory
         Me.btnExportExcel.TabIndex = 3
         Me.btnExportExcel.Text = "Export Excel"
         Me.btnExportExcel.UseVisualStyleBackColor = False
+
+        '
+        'btnSettings
+        '
+        Me.btnSettings.BackColor = System.Drawing.Color.FromArgb(41, 128, 185)
+        Me.btnSettings.FlatAppearance.BorderSize = 0
+        Me.btnSettings.FlatStyle = System.Windows.Forms.FlatStyle.Flat
+        Me.btnSettings.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
+        Me.btnSettings.ForeColor = System.Drawing.Color.White
+        Me.btnSettings.Location = New System.Drawing.Point(485, 15)
+        Me.btnSettings.Name = "btnSettings"
+        Me.btnSettings.Size = New System.Drawing.Size(110, 35)
+        Me.btnSettings.TabIndex = 4
+        Me.btnSettings.Text = "ตั้งค่าฐานข้อมูล"
+        Me.btnSettings.UseVisualStyleBackColor = False
 
         '
         'btnClose
@@ -456,5 +473,6 @@ Partial Class frmHistory
     Friend WithEvents toolStripProgressBar As ToolStripProgressBar
     Friend WithEvents saveFileDialog As SaveFileDialog
     Friend WithEvents openFileDialog As OpenFileDialog
+    Friend WithEvents btnSettings As Button
 
 End Class

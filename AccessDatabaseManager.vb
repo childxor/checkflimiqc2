@@ -14,7 +14,7 @@ Public Class AccessDatabaseManager
     Private Shared ReadOnly CONFIG_FILE As String = "Settings.config"
     
     ' กำหนดพาธของฐานข้อมูล Access
-    Private Shared _databasePath As String = Path.Combine(Application.StartupPath, "ScanData.accdb")
+    Private Shared _databasePath As String = "\\fls951\OAFAB\OA2FAB\Film charecter check\dbSystems\QRCodeScanner.accdb"
     Private Shared _password As String = "" ' รหัสผ่านฐานข้อมูล (ถ้ามี)
 
     ''' <summary>

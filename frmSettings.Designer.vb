@@ -45,15 +45,11 @@ Partial Class frmSettings
         Me.btnRunTest = New System.Windows.Forms.Button()
         Me.tabDatabase = New System.Windows.Forms.TabPage()
         Me.grpDatabaseSettings = New System.Windows.Forms.GroupBox()
-        Me.lblServer = New System.Windows.Forms.Label()
-        Me.txtServer = New System.Windows.Forms.TextBox()
         Me.lblDatabase = New System.Windows.Forms.Label()
         Me.txtDatabase = New System.Windows.Forms.TextBox()
-        Me.lblUsername = New System.Windows.Forms.Label()
-        Me.txtUsername = New System.Windows.Forms.TextBox()
         Me.lblPassword = New System.Windows.Forms.Label()
         Me.txtPassword = New System.Windows.Forms.TextBox()
-        Me.chkIntegratedSecurity = New System.Windows.Forms.CheckBox()
+        Me.btnBrowseDatabase = New System.Windows.Forms.Button()
         Me.btnTestConnection = New System.Windows.Forms.Button()
         Me.lblConnectionStatus = New System.Windows.Forms.Label()
         Me.grpBackup = New System.Windows.Forms.GroupBox()
@@ -367,15 +363,11 @@ Partial Class frmSettings
         '
         'grpDatabaseSettings
         '
-        Me.grpDatabaseSettings.Controls.Add(Me.lblServer)
-        Me.grpDatabaseSettings.Controls.Add(Me.txtServer)
         Me.grpDatabaseSettings.Controls.Add(Me.lblDatabase)
         Me.grpDatabaseSettings.Controls.Add(Me.txtDatabase)
-        Me.grpDatabaseSettings.Controls.Add(Me.lblUsername)
-        Me.grpDatabaseSettings.Controls.Add(Me.txtUsername)
         Me.grpDatabaseSettings.Controls.Add(Me.lblPassword)
         Me.grpDatabaseSettings.Controls.Add(Me.txtPassword)
-        Me.grpDatabaseSettings.Controls.Add(Me.chkIntegratedSecurity)
+        Me.grpDatabaseSettings.Controls.Add(Me.btnBrowseDatabase)
         Me.grpDatabaseSettings.Controls.Add(Me.btnTestConnection)
         Me.grpDatabaseSettings.Controls.Add(Me.lblConnectionStatus)
         Me.grpDatabaseSettings.Location = New System.Drawing.Point(8, 8)
@@ -385,100 +377,62 @@ Partial Class frmSettings
         Me.grpDatabaseSettings.Size = New System.Drawing.Size(856, 280)
         Me.grpDatabaseSettings.TabIndex = 0
         Me.grpDatabaseSettings.TabStop = False
-        Me.grpDatabaseSettings.Text = "การตั้งค่าฐานข้อมูล"
-        '
-        'lblServer
-        '
-        Me.lblServer.AutoSize = True
-        Me.lblServer.Location = New System.Drawing.Point(20, 40)
-        Me.lblServer.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
-        Me.lblServer.Name = "lblServer"
-        Me.lblServer.Size = New System.Drawing.Size(62, 19)
-        Me.lblServer.TabIndex = 0
-        Me.lblServer.Text = "Server:"
-        '
-        'txtServer
-        '
-        Me.txtServer.Location = New System.Drawing.Point(120, 36)
-        Me.txtServer.Margin = New System.Windows.Forms.Padding(4)
-        Me.txtServer.Name = "txtServer"
-        Me.txtServer.Size = New System.Drawing.Size(300, 27)
-        Me.txtServer.TabIndex = 1
-        Me.txtServer.Text = "localhost"
+        Me.grpDatabaseSettings.Text = "การตั้งค่าฐานข้อมูล Access"
         '
         'lblDatabase
         '
         Me.lblDatabase.AutoSize = True
-        Me.lblDatabase.Location = New System.Drawing.Point(20, 80)
+        Me.lblDatabase.Location = New System.Drawing.Point(20, 40)
         Me.lblDatabase.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblDatabase.Name = "lblDatabase"
-        Me.lblDatabase.Size = New System.Drawing.Size(79, 19)
-        Me.lblDatabase.TabIndex = 2
-        Me.lblDatabase.Text = "Database:"
+        Me.lblDatabase.Size = New System.Drawing.Size(94, 19)
+        Me.lblDatabase.TabIndex = 0
+        Me.lblDatabase.Text = "ไฟล์ฐานข้อมูล:"
         '
         'txtDatabase
         '
-        Me.txtDatabase.Location = New System.Drawing.Point(120, 76)
+        Me.txtDatabase.Location = New System.Drawing.Point(120, 36)
         Me.txtDatabase.Margin = New System.Windows.Forms.Padding(4)
         Me.txtDatabase.Name = "txtDatabase"
-        Me.txtDatabase.Size = New System.Drawing.Size(300, 27)
-        Me.txtDatabase.TabIndex = 3
-        '
-        'lblUsername
-        '
-        Me.lblUsername.AutoSize = True
-        Me.lblUsername.Location = New System.Drawing.Point(20, 120)
-        Me.lblUsername.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
-        Me.lblUsername.Name = "lblUsername"
-        Me.lblUsername.Size = New System.Drawing.Size(83, 19)
-        Me.lblUsername.TabIndex = 4
-        Me.lblUsername.Text = "Username:"
-        '
-        'txtUsername
-        '
-        Me.txtUsername.Location = New System.Drawing.Point(120, 116)
-        Me.txtUsername.Margin = New System.Windows.Forms.Padding(4)
-        Me.txtUsername.Name = "txtUsername"
-        Me.txtUsername.Size = New System.Drawing.Size(300, 27)
-        Me.txtUsername.TabIndex = 5
+        Me.txtDatabase.Size = New System.Drawing.Size(500, 27)
+        Me.txtDatabase.TabIndex = 1
         '
         'lblPassword
         '
         Me.lblPassword.AutoSize = True
-        Me.lblPassword.Location = New System.Drawing.Point(20, 160)
+        Me.lblPassword.Location = New System.Drawing.Point(20, 80)
         Me.lblPassword.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblPassword.Name = "lblPassword"
-        Me.lblPassword.Size = New System.Drawing.Size(79, 19)
-        Me.lblPassword.TabIndex = 6
-        Me.lblPassword.Text = "Password:"
+        Me.lblPassword.Size = New System.Drawing.Size(65, 19)
+        Me.lblPassword.TabIndex = 2
+        Me.lblPassword.Text = "รหัสผ่าน:"
         '
         'txtPassword
         '
-        Me.txtPassword.Location = New System.Drawing.Point(120, 156)
+        Me.txtPassword.Location = New System.Drawing.Point(120, 76)
         Me.txtPassword.Margin = New System.Windows.Forms.Padding(4)
         Me.txtPassword.Name = "txtPassword"
         Me.txtPassword.PasswordChar = Global.Microsoft.VisualBasic.ChrW(42)
         Me.txtPassword.Size = New System.Drawing.Size(300, 27)
-        Me.txtPassword.TabIndex = 7
+        Me.txtPassword.TabIndex = 3
         '
-        'chkIntegratedSecurity
+        'btnBrowseDatabase
         '
-        Me.chkIntegratedSecurity.AutoSize = True
-        Me.chkIntegratedSecurity.Location = New System.Drawing.Point(24, 200)
-        Me.chkIntegratedSecurity.Margin = New System.Windows.Forms.Padding(4)
-        Me.chkIntegratedSecurity.Name = "chkIntegratedSecurity"
-        Me.chkIntegratedSecurity.Size = New System.Drawing.Size(233, 23)
-        Me.chkIntegratedSecurity.TabIndex = 8
-        Me.chkIntegratedSecurity.Text = "ใช้ Windows Authentication"
-        Me.chkIntegratedSecurity.UseVisualStyleBackColor = True
+        Me.btnBrowseDatabase.Location = New System.Drawing.Point(630, 36)
+        Me.btnBrowseDatabase.Margin = New System.Windows.Forms.Padding(4)
+        Me.btnBrowseDatabase.Name = "btnBrowseDatabase"
+        Me.btnBrowseDatabase.Size = New System.Drawing.Size(80, 32)
+        Me.btnBrowseDatabase.TabIndex = 4
+        Me.btnBrowseDatabase.Text = "เลือก..."
+        Me.btnBrowseDatabase.UseVisualStyleBackColor = True
         '
         'btnTestConnection
         '
-        Me.btnTestConnection.Location = New System.Drawing.Point(450, 36)
+        Me.btnTestConnection.Location = New System.Drawing.Point(450, 76)
         Me.btnTestConnection.Margin = New System.Windows.Forms.Padding(4)
         Me.btnTestConnection.Name = "btnTestConnection"
         Me.btnTestConnection.Size = New System.Drawing.Size(120, 32)
-        Me.btnTestConnection.TabIndex = 9
+        Me.btnTestConnection.TabIndex = 5
         Me.btnTestConnection.Text = "ทดสอบการเชื่อมต่อ"
         Me.btnTestConnection.UseVisualStyleBackColor = True
         '
@@ -487,11 +441,11 @@ Partial Class frmSettings
         Me.lblConnectionStatus.AutoSize = True
         Me.lblConnectionStatus.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
         Me.lblConnectionStatus.ForeColor = System.Drawing.Color.Red
-        Me.lblConnectionStatus.Location = New System.Drawing.Point(450, 80)
+        Me.lblConnectionStatus.Location = New System.Drawing.Point(120, 120)
         Me.lblConnectionStatus.Margin = New System.Windows.Forms.Padding(4, 0, 4, 0)
         Me.lblConnectionStatus.Name = "lblConnectionStatus"
         Me.lblConnectionStatus.Size = New System.Drawing.Size(143, 20)
-        Me.lblConnectionStatus.TabIndex = 10
+        Me.lblConnectionStatus.TabIndex = 6
         Me.lblConnectionStatus.Text = "สถานะ: ไม่ได้เชื่อมต่อ"
         '
         'grpBackup
@@ -956,7 +910,7 @@ Partial Class frmSettings
         Me.lblDays.Size = New System.Drawing.Size(27, 19)
         Me.lblDays.TabIndex = 5
         Me.lblDays.Text = "วัน"
-        '
+        ' 
         'pnlButtons
         '
         Me.pnlButtons.Controls.Add(Me.btnOK)
@@ -1118,15 +1072,11 @@ Partial Class frmSettings
     Friend WithEvents btnRunTest As Button
     Friend WithEvents tabDatabase As TabPage
     Friend WithEvents grpDatabaseSettings As GroupBox
-    Friend WithEvents lblServer As Label
-    Friend WithEvents txtServer As TextBox
     Friend WithEvents lblDatabase As Label
     Friend WithEvents txtDatabase As TextBox
-    Friend WithEvents lblUsername As Label
-    Friend WithEvents txtUsername As TextBox
     Friend WithEvents lblPassword As Label
     Friend WithEvents txtPassword As TextBox
-    Friend WithEvents chkIntegratedSecurity As CheckBox
+    Friend WithEvents btnBrowseDatabase As Button
     Friend WithEvents btnTestConnection As Button
     Friend WithEvents lblConnectionStatus As Label
     Friend WithEvents grpBackup As GroupBox

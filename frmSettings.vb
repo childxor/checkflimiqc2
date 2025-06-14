@@ -1,6 +1,6 @@
 ﻿Imports System.IO
 Imports System.Text.RegularExpressions
-Imports System.Data.SqlClient
+Imports System.Data.OleDb
 Imports System.Configuration
 Imports System.Xml
 Imports Microsoft.Win32
@@ -12,6 +12,7 @@ Public Class frmSettings
     Private Const CONFIG_FILE As String = "Settings.config"
     Private originalSettings As Dictionary(Of String, Object)
     Private hasChanges As Boolean = False
+    Private Const DEFAULT_ACCESS_PATH As String = "\\fls951\OAFAB\OA2FAB\Film charecter check\dbSystems\QRCodeScanner.accdb"
 #End Region
 
 #Region "Form Events"
@@ -63,7 +64,7 @@ Public Class frmSettings
             numCleanupDays.Value = 30
 
             ' ตั้งค่าเริ่มต้นสำหรับ TextBox
-            txtServer.Text = "localhost"
+            txtDatabase.Text = DEFAULT_ACCESS_PATH
             txtExtractPattern.Text = "\+P([^+]+)\+D"
             txtLogPath.Text = Path.Combine(Application.StartupPath, "Logs")
             txtBackupPath.Text = Path.Combine(Application.StartupPath, "Backup")
@@ -80,7 +81,7 @@ Public Class frmSettings
         Try
             toolTip.SetToolTip(numScanTimeout, "ระยะเวลารอระหว่างการกดคีย์ในการสแกน (มิลลิวินาที)")
             toolTip.SetToolTip(txtExtractPattern, "รูปแบบ Regular Expression สำหรับดึงข้อมูลจาก QR Code")
-            toolTip.SetToolTip(chkIntegratedSecurity, "ใช้การยืนยันตัวตนผ่าน Windows แทนการใส่ Username/Password")
+            toolTip.SetToolTip(txtDatabase, "พาธของฐานข้อมูล Access")
             toolTip.SetToolTip(numMaxRecords, "จำนวนข้อมูลสูงสุดที่แสดงในหน้าเดียว")
             toolTip.SetToolTip(btnTestPattern, "ทดสอบรูปแบบการดึงข้อมูลกับข้อมูลตัวอย่าง")
         Catch
@@ -104,11 +105,8 @@ Public Class frmSettings
                 txtExtractPattern.Text = GetSettingValue(doc, "ExtractPattern", "\+P([^+]+)\+D")
 
                 ' Database Settings
-                txtServer.Text = GetSettingValue(doc, "Server", "localhost")
-                txtDatabase.Text = GetSettingValue(doc, "Database", "")
-                txtUsername.Text = GetSettingValue(doc, "Username", "")
-                txtPassword.Text = GetSettingValue(doc, "Password", "")
-                chkIntegratedSecurity.Checked = GetSettingValue(doc, "IntegratedSecurity", False)
+                txtDatabase.Text = GetSettingValue(doc, "AccessDatabasePath", DEFAULT_ACCESS_PATH)
+                txtPassword.Text = GetSettingValue(doc, "AccessPassword", "")
 
                 ' Backup Settings
                 chkAutoBackup.Checked = GetSettingValue(doc, "AutoBackup", False)
@@ -161,11 +159,8 @@ Public Class frmSettings
             AddSetting(doc, root, "ExtractPattern", txtExtractPattern.Text)
 
             ' Database Settings
-            AddSetting(doc, root, "Server", txtServer.Text)
-            AddSetting(doc, root, "Database", txtDatabase.Text)
-            AddSetting(doc, root, "Username", txtUsername.Text)
-            AddSetting(doc, root, "Password", EncryptPassword(txtPassword.Text))
-            AddSetting(doc, root, "IntegratedSecurity", chkIntegratedSecurity.Checked.ToString())
+            AddSetting(doc, root, "AccessDatabasePath", txtDatabase.Text)
+            AddSetting(doc, root, "AccessPassword", EncryptPassword(txtPassword.Text))
 
             ' Backup Settings
             AddSetting(doc, root, "AutoBackup", chkAutoBackup.Checked.ToString())
@@ -191,7 +186,7 @@ Public Class frmSettings
 
             ' Performance Settings
             AddSetting(doc, root, "MaxRecords", numMaxRecords.Value.ToString())
-            AddSetting(doc, root, "AutoCleanup", chkAutoCleanup.Checked.ToString())
+            AddSetting(doc, root, "AutoCleanup", chkAutoCleanup.Checked.ToString()) 
             AddSetting(doc, root, "CleanupDays", numCleanupDays.Value.ToString())
 
             doc.Save(CONFIG_FILE)
@@ -256,10 +251,8 @@ Public Class frmSettings
     Private Sub UpdateControlStates()
         Try
             ' เปิด/ปิดควบคุมตามเงื่อนไข
-            txtUsername.Enabled = Not chkIntegratedSecurity.Checked
-            txtPassword.Enabled = Not chkIntegratedSecurity.Checked
-            lblUsername.Enabled = Not chkIntegratedSecurity.Checked
-            lblPassword.Enabled = Not chkIntegratedSecurity.Checked
+            txtPassword.Enabled = True
+            lblPassword.Enabled = True
 
             txtBackupPath.Enabled = chkAutoBackup.Checked
             btnBrowseBackup.Enabled = chkAutoBackup.Checked
@@ -289,11 +282,6 @@ Public Class frmSettings
 #End Region
 
 #Region "Event Handlers - CheckBox Changes"
-    Private Sub chkIntegratedSecurity_CheckedChanged(sender As Object, e As EventArgs) Handles chkIntegratedSecurity.CheckedChanged
-        UpdateControlStates()
-        MarkAsChanged()
-    End Sub
-
     Private Sub chkAutoBackup_CheckedChanged(sender As Object, e As EventArgs) Handles chkAutoBackup.CheckedChanged
         UpdateControlStates()
         MarkAsChanged()
@@ -329,10 +317,6 @@ Public Class frmSettings
     End Sub
 
     Private Sub txtExtractPattern_TextChanged(sender As Object, e As EventArgs) Handles txtExtractPattern.TextChanged
-        MarkAsChanged()
-    End Sub
-
-    Private Sub txtServer_TextChanged(sender As Object, e As EventArgs) Handles txtServer.TextChanged
         MarkAsChanged()
     End Sub
 
@@ -406,6 +390,24 @@ Public Class frmSettings
         End If
     End Sub
 
+    Private Sub btnBrowseDatabase_Click(sender As Object, e As EventArgs) Handles btnBrowseDatabase.Click
+        Try
+            ' สร้าง OpenFileDialog สำหรับเลือกไฟล์ฐานข้อมูล Access
+            Dim fileDialog As New OpenFileDialog()
+            fileDialog.Title = "เลือกไฟล์ฐานข้อมูล Access"
+            fileDialog.Filter = "ไฟล์ฐานข้อมูล Access (*.accdb;*.mdb)|*.accdb;*.mdb|ไฟล์ทั้งหมด (*.*)|*.*"
+            fileDialog.CheckFileExists = True
+            
+            If fileDialog.ShowDialog() = DialogResult.OK Then
+                txtDatabase.Text = fileDialog.FileName
+                MarkAsChanged()
+            End If
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการเลือกไฟล์: {ex.Message}", 
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
     Private Sub btnOpenLogFolder_Click(sender As Object, e As EventArgs) Handles btnOpenLogFolder.Click
         Try
             If Directory.Exists(txtLogPath.Text) Then
@@ -448,6 +450,13 @@ Public Class frmSettings
             Return False
         End Try
 
+        ' ตรวจสอบพาธฐานข้อมูล Access
+        If Not ValidateAccessDatabasePath() Then
+            tabSettings.SelectedTab = tabDatabase
+            txtDatabase.Focus()
+            Return False
+        End If
+
         ' ตรวจสอบโฟลเดอร์
         If chkAutoBackup.Checked AndAlso Not String.IsNullOrEmpty(txtBackupPath.Text) Then
             Try
@@ -462,6 +471,36 @@ Public Class frmSettings
             Catch
                 ' ไม่ต้องทำอะไรถ้าตรวจสอบไม่ได้
             End Try
+        End If
+
+        Return True
+    End Function
+
+    Private Function ValidateAccessDatabasePath() As Boolean
+        If String.IsNullOrEmpty(txtDatabase.Text) Then
+            MessageBox.Show("กรุณาระบุพาธของฐานข้อมูล Access", "ข้อผิดพลาด",
+                         MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return False
+        End If
+
+        ' ตรวจสอบว่าไฟล์มีนามสกุลที่ถูกต้อง
+        Dim extension As String = Path.GetExtension(txtDatabase.Text).ToLower()
+        If extension <> ".accdb" AndAlso extension <> ".mdb" Then
+            MessageBox.Show("ไฟล์ฐานข้อมูลต้องเป็นนามสกุล .accdb หรือ .mdb เท่านั้น", "ข้อผิดพลาด",
+                         MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return False
+        End If
+
+        ' ตรวจสอบว่าไฟล์มีอยู่จริง
+        If Not File.Exists(txtDatabase.Text) Then
+            Dim result As DialogResult = MessageBox.Show(
+                "ไม่พบไฟล์ฐานข้อมูลตามพาธที่ระบุ" & vbNewLine &
+                "คุณต้องการใช้พาธนี้ต่อไปหรือไม่? ระบบจะสร้างฐานข้อมูลใหม่เมื่อเริ่มใช้งาน",
+                "คำเตือน", MessageBoxButtons.YesNo, MessageBoxIcon.Warning)
+            
+            If result = DialogResult.No Then
+                Return False
+            End If
         End If
 
         Return True
@@ -529,7 +568,7 @@ Public Class frmSettings
         Try
             Dim connectionString As String = BuildConnectionString()
 
-            Using conn As New SqlConnection(connectionString)
+            Using conn As New OleDbConnection(connectionString)
                 conn.Open()
                 lblConnectionStatus.Text = "สถานะ: เชื่อมต่อสำเร็จ"
                 lblConnectionStatus.ForeColor = Color.Green
@@ -547,23 +586,15 @@ Public Class frmSettings
 
     Private Function BuildConnectionString() As String
         Try
-            Dim builder As New SqlConnectionStringBuilder()
-            builder.DataSource = txtServer.Text
+            Dim connectionString As String = $"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={txtDatabase.Text};"
 
-            If Not String.IsNullOrEmpty(txtDatabase.Text) Then
-                builder.InitialCatalog = txtDatabase.Text
+            ' เพิ่มรหัสผ่านถ้ามี
+            If Not String.IsNullOrEmpty(txtPassword.Text) Then
+                connectionString += $"Jet OLEDB:Database Password={txtPassword.Text};"
             End If
 
-            If chkIntegratedSecurity.Checked Then
-                builder.IntegratedSecurity = True
-            Else
-                builder.UserID = txtUsername.Text
-                builder.Password = txtPassword.Text
-            End If
-
-            builder.ConnectTimeout = 30
-            Return builder.ConnectionString
-        Catch
+            Return connectionString
+        Catch ex As Exception
             Return ""
         End Try
     End Function
@@ -644,12 +675,9 @@ Public Class frmSettings
             chkSoundEnabled.Checked = True
             txtExtractPattern.Text = "\+P([^+]+)\+D"
 
-            txtServer.Text = "localhost"
-            txtDatabase.Text = ""
-            txtUsername.Text = ""
+            txtDatabase.Text = DEFAULT_ACCESS_PATH
             txtPassword.Text = ""
-            chkIntegratedSecurity.Checked = False
-
+            
             chkAutoBackup.Checked = False
             txtBackupPath.Text = Path.Combine(Application.StartupPath, "Backup")
             If cmbBackupInterval.Items.Count > 0 Then cmbBackupInterval.SelectedIndex = 0
@@ -728,8 +756,10 @@ Public Class frmSettings
                     Return chkSoundEnabled.Checked
                 Case "extractpattern"
                     Return txtExtractPattern.Text
-                Case "connectionstring"
-                    Return BuildConnectionString()
+                Case "accessdatabasepath"
+                    Return txtDatabase.Text
+                Case "accesspassword"
+                    Return txtPassword.Text
                 Case "theme"
                     Return cmbTheme.Text
                 Case "language"
@@ -778,6 +808,20 @@ Public Class frmSettings
         Catch
             Return testData
         End Try
+    End Function
+
+    ''' <summary>
+    ''' ดึงพาธของฐานข้อมูล Access
+    ''' </summary>
+    Public Function GetAccessDatabasePath() As String
+        Return txtDatabase.Text
+    End Function
+
+    ''' <summary>
+    ''' ดึงรหัสผ่านของฐานข้อมูล Access
+    ''' </summary>
+    Public Function GetAccessDatabasePassword() As String
+        Return txtPassword.Text
     End Function
 #End Region
 
@@ -986,7 +1030,6 @@ Public Class frmSettings
             AddHandler chkAutoExtract.CheckedChanged, AddressOf GenericChangeHandler
             AddHandler chkSoundEnabled.CheckedChanged, AddressOf GenericChangeHandler
             AddHandler txtDatabase.TextChanged, AddressOf GenericChangeHandler
-            AddHandler txtUsername.TextChanged, AddressOf GenericChangeHandler
             AddHandler txtPassword.TextChanged, AddressOf GenericChangeHandler
             AddHandler txtBackupPath.TextChanged, AddressOf GenericChangeHandler
             AddHandler cmbBackupInterval.SelectedIndexChanged, AddressOf GenericChangeHandler

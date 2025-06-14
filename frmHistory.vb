@@ -21,6 +21,7 @@ Public Class frmHistory
             InitializeForm()
             SetupDataGridView()
             SetupBackgroundWorker()
+            CheckDatabaseConnection()
             LoadScanHistory()
 
             Console.WriteLine("frmHistory_Load completed")
@@ -56,6 +57,20 @@ Public Class frmHistory
         ExportToExcel()
     End Sub
 
+    Private Sub btnSettings_Click(sender As Object, e As EventArgs) Handles btnSettings.Click
+        ' เปิดหน้าจอตั้งค่าฐานข้อมูล
+        Dim settingsForm As New frmSettings()
+        If settingsForm.ShowDialog() = DialogResult.OK Then
+            ' อัปเดตชื่อหน้าต่างเพื่อแสดงพาธฐานข้อมูลใหม่
+            Dim dbPath As String = settingsForm.GetAccessDatabasePath()
+            Me.Text = $"ประวัติการสแกน QR Code - {dbPath}"
+            
+            ' ตรวจสอบการเชื่อมต่อและโหลดข้อมูลใหม่
+            CheckDatabaseConnection()
+            LoadScanHistory()
+        End If
+    End Sub
+
     Private Sub dgvHistory_SelectionChanged(sender As Object, e As EventArgs) Handles dgvHistory.SelectionChanged
         UpdateButtonStates()
     End Sub
@@ -88,6 +103,11 @@ Public Class frmHistory
     Private Sub InitializeForm()
         Try
             Console.WriteLine("InitializeForm started")
+
+            ' แสดงพาธฐานข้อมูลที่ใช้งาน
+            Dim settings As New frmSettings()
+            Dim dbPath As String = settings.GetAccessDatabasePath()
+            Me.Text = $"ประวัติการสแกน QR Code - {dbPath}"
 
             ' ตั้งค่าเริ่มต้นสำหรับ ComboBox
             cmbStatus.Items.Clear()
@@ -232,6 +252,27 @@ Public Class frmHistory
 
         Catch ex As Exception
             Console.WriteLine($"Error in SetupBackgroundWorker: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' ตรวจสอบการเชื่อมต่อฐานข้อมูล Access
+    ''' </summary>
+    Private Sub CheckDatabaseConnection()
+        Try
+            If Not AccessDatabaseManager.IsConnected() Then
+                Dim settings As New frmSettings()
+                Dim dbPath As String = settings.GetAccessDatabasePath()
+                MessageBox.Show($"ไม่สามารถเชื่อมต่อกับฐานข้อมูล: {dbPath}" & vbNewLine &
+                              "กรุณาตรวจสอบการตั้งค่าฐานข้อมูลและสิทธิ์การเข้าถึง",
+                              "ข้อผิดพลาดการเชื่อมต่อ", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                
+                ' แสดงสถานะในแถบสถานะ
+                lblCount.Text = "ไม่สามารถเชื่อมต่อกับฐานข้อมูล"
+                lblCount.ForeColor = Color.Red
+            End If
+        Catch ex As Exception
+            Console.WriteLine($"Error checking database connection: {ex.Message}")
         End Try
     End Sub
 #End Region
