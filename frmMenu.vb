@@ -300,7 +300,7 @@ Public Class frmMenu
                 doc.Load("Settings.config")
 
                 Dim enableLogging As Boolean = GetSettingValueFromXML(doc, "EnableLogging", True)
-                Dim logPath As String = GetSettingValueFromXML(doc, "LogPath", Path.Combine(Application.StartupPath, "Logs"))
+                Dim logPath As String = GetSettingValueFromXML(doc, "LogPath", Path.Combine(System.Windows.Forms.Application.StartupPath, "Logs"))
 
                 If enableLogging AndAlso Not String.IsNullOrEmpty(logPath) Then
                     If Not Directory.Exists(logPath) Then
@@ -352,7 +352,8 @@ Public Class frmMenu
     End Sub
 
     Private Sub btnExit_Click(sender As Object, e As EventArgs) Handles btnExit.Click
-        Application.Exit()
+        ' ออกจากโปรแกรม
+        System.Windows.Forms.Application.Exit()
     End Sub
 
     Private Sub frmMenu_FormClosing(sender As Object, e As FormClosingEventArgs) Handles MyBase.FormClosing
@@ -664,8 +665,6 @@ Public Class frmMenu
         Try
             ' เริ่มต้นฐานข้อมูล
             If DatabaseManager.Initialize() Then
-                ' สร้างตารางหากยังไม่มี
-                DatabaseManager.CreateTablesIfNotExists()
                 UpdateStatusBar("เชื่อมต่อฐานข้อมูลสำเร็จ")
             Else
                 UpdateStatusBar("ไม่สามารถเชื่อมต่อฐานข้อมูลได้ - ระบบจะทำงานแบบ Offline")

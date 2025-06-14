@@ -12,7 +12,7 @@ Public Class AccessDatabaseManager
 
     ' กำหนดพาธของไฟล์การตั้งค่า
     Private Shared ReadOnly CONFIG_FILE As String = "Settings.config"
-    
+
     ' กำหนดพาธของฐานข้อมูล Access
     Private Shared _databasePath As String = "\\fls951\OAFAB\OA2FAB\Film charecter check\dbSystems\QRCodeScanner.accdb"
     Private Shared _password As String = "" ' รหัสผ่านฐานข้อมูล (ถ้ามี)
@@ -42,8 +42,8 @@ Public Class AccessDatabaseManager
                 Dim doc As New XmlDocument()
                 doc.Load(CONFIG_FILE)
 
-                _databasePath = GetSettingValueFromXML(doc, "AccessDatabasePath", 
-                    Path.Combine(Application.StartupPath, "ScanData.accdb"))
+                _databasePath = GetSettingValueFromXML(doc, "AccessDatabasePath",
+                    Path.Combine(System.Windows.Forms.Application.StartupPath, "ScanData.accdb"))
                 _password = GetSettingValueFromXML(doc, "AccessPassword", "")
 
                 Console.WriteLine($"Access database settings loaded - Path: {_databasePath}")
@@ -128,7 +128,7 @@ Public Class AccessDatabaseManager
 
             ' สร้างตารางหากยังไม่มี
             CreateTablesIfNotExists()
-            
+
             Return IsConnected()
         Catch ex As Exception
             Console.WriteLine($"Error initializing database: {ex.Message}")
@@ -156,7 +156,7 @@ Public Class AccessDatabaseManager
                 Console.WriteLine($"Access database created successfully: {_databasePath}")
             Catch adoxEx As Exception
                 Console.WriteLine($"ADOX method failed: {adoxEx.Message}")
-                
+
                 ' วิธีที่ 2: สร้างด้วย OleDb (backup method)
                 CreateDatabaseWithOleDb()
             End Try
@@ -174,13 +174,13 @@ Public Class AccessDatabaseManager
         Try
             ' สร้างไฟล์ .accdb เปล่า
             File.WriteAllBytes(_databasePath, New Byte() {})
-            
+
             ' ลองเชื่อมต่อเพื่อ initialize
             Using conn As New OleDbConnection(ConnectionString)
                 conn.Open()
                 conn.Close()
             End Using
-            
+
             Console.WriteLine($"Database created with OleDb method: {_databasePath}")
         Catch ex As Exception
             Console.WriteLine($"OleDb creation method also failed: {ex.Message}")
@@ -198,7 +198,7 @@ Public Class AccessDatabaseManager
 
                 ' ตรวจสอบว่ามีตาราง ScanRecords หรือไม่
                 Dim tableExists As Boolean = False
-                
+
                 Try
                     Dim tables As DataTable = conn.GetSchema("Tables")
                     For Each row As DataRow In tables.Rows
@@ -214,7 +214,7 @@ Public Class AccessDatabaseManager
 
                 ' สร้างตาราง ScanRecords ถ้ายังไม่มี
                 If Not tableExists Then
-                    Dim createTableSql As String = 
+                    Dim createTableSql As String =
                         "CREATE TABLE ScanRecords (" &
                         "Id AUTOINCREMENT PRIMARY KEY, " &
                         "ScanDateTime DATETIME NOT NULL, " &
@@ -227,7 +227,8 @@ Public Class AccessDatabaseManager
                         "ExtractedData MEMO, " &
                         "ValidationMessages MEMO, " &
                         "ComputerName TEXT(255), " &
-                        "UserName TEXT(255)" &
+                        "UserName TEXT(255), " &
+                        "MissionStatus TEXT(50) DEFAULT 'ไม่มี'" &
                         ")"
 
                     Using createCmd As New OleDbCommand(createTableSql, conn)
@@ -265,7 +266,7 @@ Public Class AccessDatabaseManager
             Using conn As New OleDbConnection(ConnectionString)
                 conn.Open()
 
-                Dim insertSql As String = 
+                Dim insertSql As String =
                     "INSERT INTO ScanRecords " &
                     "(ScanDateTime, ProductCode, ReferenceCode, Quantity, DateCode, IsValid, " &
                     "OriginalData, ExtractedData, ValidationMessages, ComputerName, UserName) " &
@@ -292,7 +293,7 @@ Public Class AccessDatabaseManager
                 Using idCmd As New OleDbCommand("SELECT @@IDENTITY", conn)
                     Dim id As Integer = Convert.ToInt32(idCmd.ExecuteScalar())
                     record.Id = id
-                    
+
                     Console.WriteLine($"Added scan record with ID: {id}")
                     Return id
                 End Using
@@ -318,9 +319,32 @@ Public Class AccessDatabaseManager
             Using conn As New OleDbConnection(ConnectionString)
                 conn.Open()
 
+                ' ตรวจสอบว่ามีคอลัมน์ MissionStatus หรือไม่
+                Dim hasMissionStatusColumn As Boolean = False
+                Try
+                    Dim schema As DataTable = conn.GetSchema("Columns", New String() {Nothing, Nothing, "ScanRecords", "MissionStatus"})
+                    hasMissionStatusColumn = schema.Rows.Count > 0
+                Catch ex As Exception
+                    Console.WriteLine($"Error checking MissionStatus column: {ex.Message}")
+                    hasMissionStatusColumn = False
+                End Try
+
+                ' ถ้าไม่มีคอลัมน์ MissionStatus ให้เพิ่มคอลัมน์
+                If Not hasMissionStatusColumn Then
+                    Try
+                        Using alterCmd As New OleDbCommand("ALTER TABLE ScanRecords ADD COLUMN MissionStatus TEXT(50) DEFAULT 'ไม่มี'", conn)
+                            alterCmd.ExecuteNonQuery()
+                            Console.WriteLine("Added MissionStatus column to ScanRecords table")
+                        End Using
+                    Catch ex As Exception
+                        Console.WriteLine($"Error adding MissionStatus column: {ex.Message}")
+                        ' ถ้าไม่สามารถเพิ่มคอลัมน์ได้ ให้ข้ามไปและดึงข้อมูลต่อ
+                    End Try
+                End If
+
                 ' Access ใช้ TOP แทน LIMIT
-                Dim selectSql As String = If(limit > 0, 
-                    $"SELECT TOP {limit} * FROM ScanRecords ORDER BY ScanDateTime DESC", 
+                Dim selectSql As String = If(limit > 0,
+                    $"SELECT TOP {limit} * FROM ScanRecords ORDER BY ScanDateTime DESC",
                     "SELECT * FROM ScanRecords ORDER BY ScanDateTime DESC")
 
                 Using selectCmd As New OleDbCommand(selectSql, conn)
@@ -340,6 +364,17 @@ Public Class AccessDatabaseManager
                             record.ValidationMessages = If(reader("ValidationMessages") IsNot DBNull.Value, reader("ValidationMessages").ToString(), "")
                             record.ComputerName = If(reader("ComputerName") IsNot DBNull.Value, reader("ComputerName").ToString(), "")
                             record.UserName = If(reader("UserName") IsNot DBNull.Value, reader("UserName").ToString(), "")
+
+                            ' ดึงข้อมูลสถานะ Mission ถ้ามีคอลัมน์
+                            If hasMissionStatusColumn Then
+                                Try
+                                    record.MissionStatus = If(reader("MissionStatus") IsNot DBNull.Value, reader("MissionStatus").ToString(), "ไม่มี")
+                                Catch
+                                    record.MissionStatus = "ไม่มี"
+                                End Try
+                            Else
+                                record.MissionStatus = "ไม่มี"
+                            End If
 
                             results.Add(record)
                         End While
@@ -371,7 +406,7 @@ Public Class AccessDatabaseManager
                 Using deleteCmd As New OleDbCommand("DELETE FROM ScanRecords WHERE Id = ?", conn)
                     deleteCmd.Parameters.AddWithValue("@Id", id)
                     Dim rowsAffected As Integer = deleteCmd.ExecuteNonQuery()
-                    
+
                     Console.WriteLine($"Deleted scan record ID {id}, rows affected: {rowsAffected}")
                     Return rowsAffected > 0
                 End Using
@@ -395,7 +430,7 @@ Public Class AccessDatabaseManager
             Using conn As New OleDbConnection(ConnectionString)
                 conn.Open()
 
-                Dim updateSql As String = 
+                Dim updateSql As String =
                     "UPDATE ScanRecords SET " &
                     "ProductCode = ?, " &
                     "ReferenceCode = ?, " &
@@ -418,7 +453,7 @@ Public Class AccessDatabaseManager
                     updateCmd.Parameters.AddWithValue("@Id", record.Id)
 
                     Dim rowsAffected As Integer = updateCmd.ExecuteNonQuery()
-                    
+
                     Console.WriteLine($"Updated scan record ID {record.Id}, rows affected: {rowsAffected}")
                     Return rowsAffected > 0
                 End Using
@@ -469,13 +504,13 @@ Public Class AccessDatabaseManager
                         End While
                     End Using
                 End Using
-                
+
                 conn.Close()
             End Using
-            
+
             Console.WriteLine($"Found {results.Count} records for product code: {productCode}")
             Return results
-            
+
         Catch ex As Exception
             Console.WriteLine($"Error searching by product code: {ex.Message}")
             Throw New Exception($"ไม่สามารถค้นหาข้อมูลตามรหัสผลิตภัณฑ์ได้: {ex.Message}", ex)
@@ -541,7 +576,7 @@ Public Class AccessDatabaseManager
 
                 ' คัดลอกไฟล์ฐานข้อมูล
                 File.Copy(_databasePath, backupPath, True)
-                
+
                 Console.WriteLine($"Database backed up to: {backupPath}")
                 Return True
             End If
@@ -570,7 +605,7 @@ Public Class AccessDatabaseManager
 
                 ' คัดลอกไฟล์สำรองมาแทนที่
                 File.Copy(backupPath, _databasePath, True)
-                
+
                 Console.WriteLine($"Database restored from: {backupPath}")
                 Return True
             End If
@@ -598,7 +633,7 @@ Public Class AccessDatabaseManager
                 Using deleteCmd As New OleDbCommand("DELETE FROM ScanRecords WHERE ScanDateTime < ?", conn)
                     deleteCmd.Parameters.AddWithValue("@CutoffDate", cutoffDate)
                     Dim deletedCount As Integer = deleteCmd.ExecuteNonQuery()
-                    
+
                     Console.WriteLine($"Cleaned up {deletedCount} old records older than {daysOld} days")
                     Return deletedCount
                 End Using
@@ -612,6 +647,60 @@ Public Class AccessDatabaseManager
         End Try
     End Function
 
+    ''' <summary>
+    ''' อัปเดตสถานะ Mission ของรายการสแกน
+    ''' </summary>
+    ''' <param name="recordId">ID ของรายการที่ต้องการอัปเดต</param>
+    ''' <param name="missionStatus">สถานะ Mission ใหม่</param>
+    ''' <returns>True ถ้าอัปเดตสำเร็จ, False ถ้าไม่สำเร็จ</returns>
+    Public Shared Function UpdateMissionStatus(recordId As Integer, missionStatus As String) As Boolean
+        Try
+            Using conn As New OleDbConnection(ConnectionString)
+                conn.Open()
+
+                ' ตรวจสอบว่ามีคอลัมน์ MissionStatus หรือไม่
+                Dim columnExists As Boolean = False
+                Try
+                    Dim schema As DataTable = conn.GetSchema("Columns", New String() {Nothing, Nothing, "ScanRecords", "MissionStatus"})
+                    columnExists = schema.Rows.Count > 0
+                Catch ex As Exception
+                    Console.WriteLine($"Error checking MissionStatus column: {ex.Message}")
+                    columnExists = False
+                End Try
+
+                ' ถ้าไม่มีคอลัมน์ MissionStatus ให้เพิ่มคอลัมน์
+                If Not columnExists Then
+                    Try
+                        Using alterCmd As New OleDbCommand("ALTER TABLE ScanRecords ADD COLUMN MissionStatus TEXT(50)", conn)
+                            alterCmd.ExecuteNonQuery()
+                            Console.WriteLine("Added MissionStatus column to ScanRecords table")
+                        End Using
+                    Catch ex As Exception
+                        Console.WriteLine($"Error adding MissionStatus column: {ex.Message}")
+                        ' ถ้าไม่สามารถเพิ่มคอลัมน์ได้ ให้ข้ามไปและพยายามอัปเดตต่อ
+                    End Try
+                End If
+
+                ' อัปเดตสถานะ Mission
+                Using updateCmd As New OleDbCommand("UPDATE ScanRecords SET MissionStatus = ? WHERE Id = ?", conn)
+                    updateCmd.Parameters.AddWithValue("@MissionStatus", missionStatus)
+                    updateCmd.Parameters.AddWithValue("@Id", recordId)
+
+                    Dim rowsAffected As Integer = updateCmd.ExecuteNonQuery()
+
+                    Console.WriteLine($"Updated mission status for record ID {recordId} to {missionStatus}, rows affected: {rowsAffected}")
+                    Return rowsAffected > 0
+                End Using
+
+                conn.Close()
+            End Using
+
+        Catch ex As Exception
+            Console.WriteLine($"Error updating mission status: {ex.Message}")
+            Return False
+        End Try
+    End Function
+
 End Class
 
 ''' <summary>
@@ -622,14 +711,14 @@ Public Class DatabaseStatistics
     Public Property ValidRecords As Integer = 0
     Public Property InvalidRecords As Integer = 0
     Public Property LastScanDate As DateTime = DateTime.MinValue
-    
+
     Public ReadOnly Property ValidPercentage As Double
         Get
             If TotalRecords = 0 Then Return 0
             Return (ValidRecords / TotalRecords) * 100
         End Get
     End Property
-    
+
     Public ReadOnly Property InvalidPercentage As Double
         Get
             If TotalRecords = 0 Then Return 0

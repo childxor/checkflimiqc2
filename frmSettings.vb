@@ -66,8 +66,8 @@ Public Class frmSettings
             ' ตั้งค่าเริ่มต้นสำหรับ TextBox
             txtDatabase.Text = DEFAULT_ACCESS_PATH
             txtExtractPattern.Text = "\+P([^+]+)\+D"
-            txtLogPath.Text = Path.Combine(Application.StartupPath, "Logs")
-            txtBackupPath.Text = Path.Combine(Application.StartupPath, "Backup")
+            txtLogPath.Text = Path.Combine(System.Windows.Forms.Application.StartupPath, "Logs")
+            txtBackupPath.Text = Path.Combine(System.Windows.Forms.Application.StartupPath, "Backup")
 
             ' เปิดใช้งานควบคุมตามค่าเริ่มต้น
             UpdateControlStates()
@@ -110,7 +110,7 @@ Public Class frmSettings
 
                 ' Backup Settings
                 chkAutoBackup.Checked = GetSettingValue(doc, "AutoBackup", False)
-                txtBackupPath.Text = GetSettingValue(doc, "BackupPath", Path.Combine(Application.StartupPath, "Backup"))
+                txtBackupPath.Text = GetSettingValue(doc, "BackupPath", Path.Combine(System.Windows.Forms.Application.StartupPath, "Backup"))
                 cmbBackupInterval.Text = GetSettingValue(doc, "BackupInterval", "ทุกวัน")
 
                 ' Display Settings
@@ -128,7 +128,7 @@ Public Class frmSettings
                 ' Logging Settings
                 chkEnableLogging.Checked = GetSettingValue(doc, "EnableLogging", True)
                 cmbLogLevel.Text = GetSettingValue(doc, "LogLevel", "Info")
-                txtLogPath.Text = GetSettingValue(doc, "LogPath", Path.Combine(Application.StartupPath, "Logs"))
+                txtLogPath.Text = GetSettingValue(doc, "LogPath", Path.Combine(System.Windows.Forms.Application.StartupPath, "Logs"))
 
                 ' Performance Settings
                 numMaxRecords.Value = GetSettingValue(doc, "MaxRecords", 1000)
@@ -679,7 +679,7 @@ Public Class frmSettings
             txtPassword.Text = ""
             
             chkAutoBackup.Checked = False
-            txtBackupPath.Text = Path.Combine(Application.StartupPath, "Backup")
+            txtBackupPath.Text = Path.Combine(System.Windows.Forms.Application.StartupPath, "Backup")
             If cmbBackupInterval.Items.Count > 0 Then cmbBackupInterval.SelectedIndex = 0
 
             If cmbTheme.Items.Count > 0 Then cmbTheme.SelectedIndex = 0
@@ -694,7 +694,7 @@ Public Class frmSettings
 
             chkEnableLogging.Checked = True
             If cmbLogLevel.Items.Count > 2 Then cmbLogLevel.SelectedIndex = 2
-            txtLogPath.Text = Path.Combine(Application.StartupPath, "Logs")
+            txtLogPath.Text = Path.Combine(System.Windows.Forms.Application.StartupPath, "Logs")
 
             numMaxRecords.Value = 1000
             chkAutoCleanup.Checked = False
@@ -1008,7 +1008,7 @@ Public Class frmSettings
     ''' </summary>
     Private Sub CheckDiskSpace()
         Try
-            Dim drive As New DriveInfo(Path.GetPathRoot(Application.StartupPath))
+            Dim drive As New DriveInfo(Path.GetPathRoot(System.Windows.Forms.Application.StartupPath))
             Dim freeSpaceGB As Double = drive.AvailableFreeSpace / (1024 * 1024 * 1024)
 
             If freeSpaceGB < 1 Then ' เตือนเมื่อพื้นที่ว่างน้อยกว่า 1 GB

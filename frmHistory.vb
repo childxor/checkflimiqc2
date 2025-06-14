@@ -2,7 +2,13 @@
 Imports System.Diagnostics
 Imports System.IO
 Imports System.Runtime.InteropServices
-Imports Microsoft.Office.Interop.Excel
+Imports Excel = Microsoft.Office.Interop.Excel
+Imports System.Text
+Imports System.Data
+Imports System.Threading
+Imports System.ComponentModel
+Imports System.Windows.Forms
+Imports System.Text.RegularExpressions
 
 Public Class frmHistory
 
@@ -61,13 +67,19 @@ Public Class frmHistory
         ' เปิดหน้าจอตั้งค่าฐานข้อมูล
         Dim settingsForm As New frmSettings()
         If settingsForm.ShowDialog() = DialogResult.OK Then
-            ' อัปเดตชื่อหน้าต่างเพื่อแสดงพาธฐานข้อมูลใหม่
-            Dim dbPath As String = settingsForm.GetAccessDatabasePath()
-            Me.Text = $"ประวัติการสแกน QR Code - {dbPath}"
-            
-            ' ตรวจสอบการเชื่อมต่อและโหลดข้อมูลใหม่
-            CheckDatabaseConnection()
-            LoadScanHistory()
+            ' ตรวจสอบว่ามีการเปลี่ยนแปลงการตั้งค่าหรือไม่
+            If settingsForm.HasUnsavedChanges Then
+                ' เริ่มต้นการใช้งานฐานข้อมูลใหม่ตามการตั้งค่าที่เปลี่ยนแปลง
+                AccessDatabaseManager.Initialize()
+
+                ' อัปเดตชื่อหน้าต่างเพื่อแสดงพาธฐานข้อมูลใหม่
+                Dim dbPath As String = AccessDatabaseManager.ConnectionString
+                Me.Text = $"ประวัติการสแกน QR Code - {dbPath}"
+
+                ' ตรวจสอบการเชื่อมต่อและโหลดข้อมูลใหม่
+                CheckDatabaseConnection()
+                LoadScanHistory()
+            End If
         End If
     End Sub
 
@@ -77,8 +89,14 @@ Public Class frmHistory
 
     Private Sub dgvHistory_CellContentClick(sender As Object, e As DataGridViewCellEventArgs) Handles dgvHistory.CellContentClick
         ' จัดการการคลิกปุ่มในเซลล์
-        If e.RowIndex >= 0 AndAlso e.ColumnIndex = 0 Then ' คอลัมน์ปุ่มตรวจสอบ Excel
-            CheckExcelFile(e.RowIndex)
+        If e.RowIndex >= 0 Then
+            If e.ColumnIndex = dgvHistory.Columns("btnCheckExcel").Index Then
+                ' คลิกปุ่มตรวจสอบ Excel
+                CheckExcelFile(e.RowIndex)
+            ElseIf e.ColumnIndex = dgvHistory.Columns("btnCreateMission").Index Then
+                ' คลิกปุ่ม Mission
+                HandleMissionButton(e.RowIndex)
+            End If
         End If
     End Sub
 
@@ -87,6 +105,10 @@ Public Class frmHistory
     End Sub
 
     Private Sub cmbStatus_SelectedIndexChanged(sender As Object, e As EventArgs) Handles cmbStatus.SelectedIndexChanged
+        ApplyFilters()
+    End Sub
+
+    Private Sub cmbMissionStatus_SelectedIndexChanged(sender As Object, e As EventArgs)
         ApplyFilters()
     End Sub
 
@@ -105,14 +127,33 @@ Public Class frmHistory
             Console.WriteLine("InitializeForm started")
 
             ' แสดงพาธฐานข้อมูลที่ใช้งาน
-            Dim settings As New frmSettings()
-            Dim dbPath As String = settings.GetAccessDatabasePath()
+            Dim dbPath As String = AccessDatabaseManager.ConnectionString
             Me.Text = $"ประวัติการสแกน QR Code - {dbPath}"
 
-            ' ตั้งค่าเริ่มต้นสำหรับ ComboBox
+            ' ตั้งค่าเริ่มต้นสำหรับ ComboBox สถานะความถูกต้อง
             cmbStatus.Items.Clear()
             cmbStatus.Items.AddRange(New String() {"ทั้งหมด", "ถูกต้อง", "ไม่ถูกต้อง"})
             cmbStatus.SelectedIndex = 0
+
+            ' เพิ่ม ComboBox สำหรับกรองสถานะ Mission
+            If Not pnlFilter.Controls.ContainsKey("cmbMissionStatus") Then
+                Dim lblMissionStatus As New System.Windows.Forms.Label()
+                lblMissionStatus.Name = "lblMissionStatus"
+                lblMissionStatus.Text = "สถานะ Mission:"
+                lblMissionStatus.AutoSize = True
+                lblMissionStatus.Location = New System.Drawing.Point(655, 30)
+                grpFilter.Controls.Add(lblMissionStatus)
+
+                Dim cmbMissionStatus As New ComboBox()
+                cmbMissionStatus.Name = "cmbMissionStatus"
+                cmbMissionStatus.DropDownStyle = ComboBoxStyle.DropDownList
+                cmbMissionStatus.Items.AddRange(New String() {"ทั้งหมด", "ไม่มี", "รอดำเนินการ", "สำเร็จ"})
+                cmbMissionStatus.SelectedIndex = 0
+                cmbMissionStatus.Location = New System.Drawing.Point(655, 48)
+                cmbMissionStatus.Size = New Size(120, 23)
+                AddHandler cmbMissionStatus.SelectedIndexChanged, AddressOf cmbMissionStatus_SelectedIndexChanged
+                grpFilter.Controls.Add(cmbMissionStatus)
+            End If
 
             ' ตั้งค่าวันที่เริ่มต้น
             dtpFromDate.Value = DateTime.Now.AddDays(-7)
@@ -162,11 +203,20 @@ Public Class frmHistory
             ' สร้างคอลัมน์ปุ่มสร้าง Mission
             Dim btnCreateMission As New DataGridViewButtonColumn()
             btnCreateMission.Name = "btnCreateMission"
-            btnCreateMission.HeaderText = "สร้าง Mission"
+            btnCreateMission.HeaderText = "Mission"
             btnCreateMission.Text = "🚀 สร้าง"
-            btnCreateMission.UseColumnTextForButtonValue = True
-            btnCreateMission.Width = 65
+            btnCreateMission.UseColumnTextForButtonValue = False
+            btnCreateMission.Width = 100
+            'สีปุ่ม
+            btnCreateMission.DefaultCellStyle.ForeColor = Color.Blue
             dgvHistory.Columns.Add(btnCreateMission)
+
+            ' สร้างคอลัมน์สถานะ Mission
+            Dim colMissionStatus As New DataGridViewTextBoxColumn()
+            colMissionStatus.Name = "MissionStatus"
+            colMissionStatus.HeaderText = "สถานะ Mission"
+            colMissionStatus.Width = 120
+            dgvHistory.Columns.Add(colMissionStatus)
 
             ' สร้างคอลัมน์วันที่/เวลา
             Dim colDateTime As New DataGridViewTextBoxColumn()
@@ -260,19 +310,28 @@ Public Class frmHistory
     ''' </summary>
     Private Sub CheckDatabaseConnection()
         Try
-            If Not AccessDatabaseManager.IsConnected() Then
-                Dim settings As New frmSettings()
-                Dim dbPath As String = settings.GetAccessDatabasePath()
+            ' ดึงการตั้งค่าฐานข้อมูลจาก Settings
+            Dim settings As New frmSettings()
+            Dim dbPath As String = settings.GetAccessDatabasePath()
+
+            ' เริ่มต้นการใช้งานฐานข้อมูล
+            If Not AccessDatabaseManager.Initialize() Then
                 MessageBox.Show($"ไม่สามารถเชื่อมต่อกับฐานข้อมูล: {dbPath}" & vbNewLine &
                               "กรุณาตรวจสอบการตั้งค่าฐานข้อมูลและสิทธิ์การเข้าถึง",
                               "ข้อผิดพลาดการเชื่อมต่อ", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-                
+
                 ' แสดงสถานะในแถบสถานะ
                 lblCount.Text = "ไม่สามารถเชื่อมต่อกับฐานข้อมูล"
                 lblCount.ForeColor = Color.Red
+            Else
+                ' เชื่อมต่อสำเร็จ
+                lblCount.Text = "เชื่อมต่อฐานข้อมูลสำเร็จ"
+                lblCount.ForeColor = Color.Green
             End If
         Catch ex As Exception
             Console.WriteLine($"Error checking database connection: {ex.Message}")
+            lblCount.Text = $"ข้อผิดพลาดการเชื่อมต่อ: {ex.Message}"
+            lblCount.ForeColor = Color.Red
         End Try
     End Sub
 #End Region
@@ -294,12 +353,16 @@ Public Class frmHistory
             btnExport.Enabled = False
             btnExportExcel.Enabled = False
 
+            ' ดึงค่า MaxRecords จาก Settings
+            Dim settings As New frmSettings()
+            Dim maxRecords As Integer = CInt(settings.GetSetting("maxrecords"))
+
             If backgroundWorker IsNot Nothing AndAlso Not backgroundWorker.IsBusy Then
-                backgroundWorker.RunWorkerAsync()
+                backgroundWorker.RunWorkerAsync(maxRecords)
             Else
                 ' ถ้า background worker ไม่พร้อม ให้โหลดแบบ synchronous
+                LoadDataSynchronous(maxRecords)
             End If
-            LoadDataSynchronous()
 
         Catch ex As Exception
             Console.WriteLine($"Error in LoadScanHistory: {ex.Message}")
@@ -314,7 +377,8 @@ Public Class frmHistory
             Console.WriteLine("Background worker started")
 
             ' โหลดข้อมูลจากฐานข้อมูล
-            Dim data As List(Of ScanDataRecord) = DatabaseManager.GetScanHistory(1000)
+            Dim maxRecords As Integer = CInt(e.Argument)
+            Dim data As List(Of ScanDataRecord) = AccessDatabaseManager.GetScanHistory(maxRecords)
 
             backgroundWorker.ReportProgress(50, "กำลังประมวลผลข้อมูล...")
 
@@ -360,10 +424,10 @@ Public Class frmHistory
         End Try
     End Sub
 
-    Private Sub LoadDataSynchronous()
+    Private Sub LoadDataSynchronous(maxRecords As Integer)
         Try
             Console.WriteLine("Loading data synchronously")
-            scanHistory = DatabaseManager.GetScanHistory(1000)
+            scanHistory = AccessDatabaseManager.GetScanHistory(maxRecords)
             Console.WriteLine($"Loaded {scanHistory.Count} records synchronously")
 
             ApplyFilters()
@@ -398,44 +462,53 @@ Public Class frmHistory
 #Region "Data Filtering and Display"
     Private Sub ApplyFilters()
         Try
-            If scanHistory Is Nothing Then
-                scanHistory = New List(Of ScanDataRecord)()
+            If scanHistory Is Nothing Then Return
+
+            ' ดึงค่าการกรอง
+            Dim searchText As String = txtSearch.Text.Trim().ToLower()
+            Dim statusFilter As String = cmbStatus.SelectedItem.ToString()
+
+            ' ดึงค่าการกรองสถานะ Mission
+            Dim missionStatusFilter As String = "ทั้งหมด"
+            Dim cmbMissionStatus As ComboBox = TryCast(grpFilter.Controls("cmbMissionStatus"), ComboBox)
+            If cmbMissionStatus IsNot Nothing AndAlso cmbMissionStatus.SelectedItem IsNot Nothing Then
+                missionStatusFilter = cmbMissionStatus.SelectedItem.ToString()
             End If
 
-            Dim filtered As IEnumerable(Of ScanDataRecord) = scanHistory
+            Dim fromDate As DateTime = dtpFromDate.Value.Date
+            Dim toDate As DateTime = dtpToDate.Value.Date.AddDays(1).AddSeconds(-1) ' ถึงสิ้นวัน
 
-            ' กรองตามข้อความค้นหา
-            If Not String.IsNullOrEmpty(txtSearch.Text.Trim()) Then
-                Dim searchText As String = txtSearch.Text.Trim().ToLower()
-                filtered = filtered.Where(Function(r) _
-                    (Not String.IsNullOrEmpty(r.ProductCode) AndAlso r.ProductCode.ToLower().Contains(searchText)) OrElse
-                    (Not String.IsNullOrEmpty(r.OriginalData) AndAlso r.OriginalData.ToLower().Contains(searchText)) OrElse
-                    (Not String.IsNullOrEmpty(r.ReferenceCode) AndAlso r.ReferenceCode.ToLower().Contains(searchText))
-                )
-            End If
+            ' กรองข้อมูล
+            filteredHistory = scanHistory.Where(Function(record)
+                                                    ' กรองตามวันที่
+                                                    Dim isInDateRange As Boolean = record.ScanDateTime >= fromDate AndAlso record.ScanDateTime <= toDate
 
-            ' กรองตามสถานะ
-            If cmbStatus.SelectedIndex > 0 Then
-                Dim isValid As Boolean = (cmbStatus.SelectedIndex = 1) ' 1 = ถูกต้อง, 2 = ไม่ถูกต้อง
-                filtered = filtered.Where(Function(r) r.IsValid = isValid)
-            End If
+                                                    ' กรองตามสถานะความถูกต้อง
+                                                    Dim matchesStatus As Boolean = statusFilter = "ทั้งหมด" OrElse
+                                              (statusFilter = "ถูกต้อง" AndAlso record.IsValid) OrElse
+                                              (statusFilter = "ไม่ถูกต้อง" AndAlso Not record.IsValid)
 
-            ' กรองตามวันที่
-            filtered = filtered.Where(Function(r)
-                                          Dim scanDate As DateTime = r.ScanDateTime
-                                          Dim fromDate As DateTime = dtpFromDate.Value
-                                          Dim toDate As DateTime = dtpToDate.Value
-                                          Return scanDate.Date >= fromDate.Date AndAlso scanDate.Date <= toDate.Date
-                                      End Function)
+                                                    ' กรองตามสถานะ Mission
+                                                    Dim matchesMissionStatus As Boolean = missionStatusFilter = "ทั้งหมด" OrElse
+                                                     record.MissionStatus = missionStatusFilter
 
-            filteredHistory = filtered.OrderByDescending(Function(r) r.ScanDateTime).ToList()
+                                                    ' กรองตามข้อความค้นหา
+                                                    Dim matchesSearch As Boolean = String.IsNullOrEmpty(searchText) OrElse
+                                             record.ProductCode.ToLower().Contains(searchText) OrElse
+                                             record.ReferenceCode.ToLower().Contains(searchText) OrElse
+                                             record.DateCode.ToLower().Contains(searchText)
 
+                                                    ' ต้องตรงกับทุกเงื่อนไข
+                                                    Return isInDateRange AndAlso matchesStatus AndAlso matchesMissionStatus AndAlso matchesSearch
+                                                End Function).ToList()
+
+            ' แสดงผลข้อมูลที่กรอง
             DisplayData()
 
         Catch ex As Exception
             Console.WriteLine($"Error in ApplyFilters: {ex.Message}")
-            filteredHistory = New List(Of ScanDataRecord)()
-            DisplayData()
+            MessageBox.Show($"เกิดข้อผิดพลาดในการกรองข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
 
@@ -457,32 +530,53 @@ Public Class frmHistory
                         .Cells("ComputerName").Value = record.ComputerName
                         .Cells("UserName").Value = record.UserName
 
-                        ' เก็บข้อมูลต้นฉบับใน Tag
-                        .Tag = record
+                        ' แสดงสถานะ Mission และกำหนดปุ่มตามสถานะ
+                        .Cells("MissionStatus").Value = record.MissionStatus
 
-                        ' กำหนดสีตามสถานะ
-                        If record.IsValid Then
-                            .DefaultCellStyle.ForeColor = System.Drawing.Color.FromArgb(46, 125, 50)
-                        Else
-                            .DefaultCellStyle.ForeColor = System.Drawing.Color.FromArgb(231, 76, 60)
-                        End If
+                        ' กำหนดสีของข้อความสถานะ Mission
+                        Select Case record.MissionStatus
+                            Case "รอดำเนินการ"
+                                .Cells("MissionStatus").Style.ForeColor = Color.Orange
+                            Case "สำเร็จ"
+                                .Cells("MissionStatus").Style.ForeColor = Color.Green
+                        End Select
+
+                        ' กำหนดปุ่ม Mission ตามสถานะ
+                        Select Case record.MissionStatus
+                            Case "ไม่มี"
+                                If record.IsValid Then
+                                    .Cells("btnCreateMission").Value = "🚀 สร้าง"
+                                    .Cells("btnCreateMission").Style.ForeColor = Color.Blue
+                                Else
+                                    .Cells("btnCreateMission").Value = "⛔ ไม่สามารถสร้าง"
+                                    .Cells("btnCreateMission").Style.ForeColor = Color.Gray
+                                End If
+                            Case "รอดำเนินการ"
+                                .Cells("btnCreateMission").Value = "📋 ตรวจสอบ"
+                                .Cells("btnCreateMission").Style.ForeColor = Color.Orange
+                            Case "สำเร็จ"
+                                .Cells("btnCreateMission").Value = "✅ สำเร็จ"
+                                .Cells("btnCreateMission").Style.ForeColor = Color.Green
+                        End Select
+
+                        ' เก็บข้อมูลในแท็กของแถว
+                        .Tag = record
                     End With
                 Next
-            End If
 
-            ' อัปเดตจำนวนรายการ
-            Dim totalCount As Integer = If(scanHistory?.Count, 0)
-            Dim filteredCount As Integer = If(filteredHistory?.Count, 0)
-
-            If filteredCount = totalCount Then
-                lblCount.Text = $"จำนวนรายการ: {totalCount}"
+                ' อัปเดตจำนวนรายการที่แสดง
+                lblCount.Text = $"จำนวนรายการ: {filteredHistory.Count}"
             Else
-                lblCount.Text = $"จำนวนรายการ: {filteredCount} จาก {totalCount} รายการ"
+                lblCount.Text = "ไม่พบข้อมูล"
             End If
+
+            ' อัปเดตสถานะปุ่ม
+            UpdateButtonStates()
 
         Catch ex As Exception
             Console.WriteLine($"Error in DisplayData: {ex.Message}")
-            lblCount.Text = "เกิดข้อผิดพลาดในการแสดงข้อมูล"
+            MessageBox.Show($"เกิดข้อผิดพลาดในการแสดงข้อมูล: {ex.Message}",
+                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
         End Try
     End Sub
 
@@ -549,6 +643,55 @@ Public Class frmHistory
         End Try
     End Sub
 
+    ''' <summary>
+    ''' จัดการการคลิกปุ่ม Mission
+    ''' </summary>
+    Private Sub HandleMissionButton(rowIndex As Integer)
+        Try
+            If rowIndex < 0 OrElse rowIndex >= dgvHistory.Rows.Count Then
+                Return
+            End If
+
+            Dim record As ScanDataRecord = CType(dgvHistory.Rows(rowIndex).Tag, ScanDataRecord)
+            If record Is Nothing Then Return
+
+            Select Case record.MissionStatus
+                Case "ไม่มี"
+                    ' ถ้าสถานะไม่ถูกต้อง จะไม่สามารถสร้าง Mission ได้
+                    If Not record.IsValid Then
+                        MessageBox.Show("ไม่สามารถสร้าง Mission ได้เนื่องจากข้อมูลไม่ถูกต้อง",
+                                       "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                        Return
+                    End If
+
+                    ' สร้าง Mission ใหม่
+                    If CreateNewMission(record) Then
+                        ' อัปเดตสถานะเป็น "รอดำเนินการ"
+                        record.MissionStatus = "รอดำเนินการ"
+                        UpdateMissionStatus(record)
+
+                        ' อัปเดตการแสดงผลในตาราง
+                        dgvHistory.Rows(rowIndex).Cells("MissionStatus").Value = "รอดำเนินการ"
+                        dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Value = "📋 ตรวจสอบ"
+                        dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Style.ForeColor = Color.Orange
+                    End If
+
+                Case "รอดำเนินการ"
+                    ' ตรวจสอบสถานะของ Mission
+                    CheckMissionStatus(record, rowIndex)
+
+                Case "สำเร็จ"
+                    ' แสดงรายละเอียด Mission ที่สำเร็จแล้ว
+                    ShowCompletedMissionDetails(record)
+            End Select
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการจัดการ Mission: {ex.Message}",
+                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Console.WriteLine($"Error in HandleMissionButton: {ex.Message}")
+        End Try
+    End Sub
+
     Private Function CheckNetworkConnection() As NetworkCheckResult
         Dim result As New NetworkCheckResult()
 
@@ -596,10 +739,10 @@ Public Class frmHistory
     Private Sub HandleExcelFileAccess(productCode As String, networkResult As NetworkCheckResult)
         Try
             If networkResult.NetworkType = "OA" Then
-                Dim excelPath As String = "\\fls951\OAFAB\OA2FAB\Film charecter check\Database.xlsx"
+                Dim excelPath As String = "\\10.24.179.2\OAFAB\OA2FAB\Film charecter check\Database.xlsx"
 
                 If File.Exists(excelPath) Then
-                    ' ค้นหาข้อมูลในไฟล์ Excel
+                    ' ค้นหาข้อมูลในไฟล์ Excel โดยใช้ฟังก์ชัน SearchProductInExcel จาก ExcelUtility
                     SearchAndDisplayExcelData(excelPath, productCode)
                 Else
                     MessageBox.Show($"ไม่พบไฟล์ Excel ที่ต้องการ:{vbNewLine}{excelPath}",
@@ -637,7 +780,7 @@ Public Class frmHistory
             searchForm.Show(Me)
             System.Windows.Forms.Application.DoEvents()
 
-            ' ค้นหาข้อมูลในไฟล์ Excel
+            ' ค้นหาข้อมูลในไฟล์ Excel โดยใช้ฟังก์ชัน SearchProductInExcel จาก ExcelUtility
             Dim searchResult As ExcelUtility.ExcelSearchResult = ExcelUtility.SearchProductInExcel(excelPath, productCode)
 
             searchForm.Close()
@@ -697,7 +840,7 @@ Public Class frmHistory
                         message.AppendLine($"• เวลาที่ใช้: {fileSearchResult.SearchDuration.TotalSeconds:F2} วินาที")
 
                         If fileSearchResult.ErrorDirectories.Count > 0 Then
-                            message.AppendLine($"• โฟลเดอร์ที่เข้าถึงไม่ได้: {fileSearchResult.ErrorDirectories.Count}")
+                            message.AppendLine($"⚠️ มีโฟลเดอร์ที่เข้าถึงไม่ได้ {fileSearchResult.ErrorDirectories.Count} โฟลเดอร์")
                         End If
                     Else
                         message.AppendLine()
@@ -858,6 +1001,31 @@ Public Class frmHistory
     End Sub
 
     ''' <summary>
+    ''' ค้นหาข้อมูลในไฟล์ Excel โดยใช้ ExcelUtility
+    ''' </summary>
+    Private Function SearchProductInExcel(productCode As String) As ExcelUtility.ExcelSearchResult
+        ' กำหนดเส้นทางไฟล์ Excel
+        Dim excelFilePath As String = "\\10.24.179.2\OAFAB\OA2FAB\Film charecter check\Database.xlsx"
+
+        ' เรียกใช้งานฟังก์ชัน SearchProductInExcel จากคลาส ExcelUtility
+        Try
+            Return ExcelUtility.SearchProductInExcel(excelFilePath, productCode)
+        Catch ex As Exception
+            Console.WriteLine($"Error in SearchProductInExcel: {ex.Message}")
+
+            ' สร้าง result ที่แสดงข้อผิดพลาด
+            Dim errorResult As New ExcelUtility.ExcelSearchResult()
+            errorResult.SearchedProductCode = productCode
+            errorResult.ExcelFilePath = excelFilePath
+            errorResult.IsSuccess = False
+            errorResult.ErrorMessage = $"เกิดข้อผิดพลาดในการค้นหา: {ex.Message}"
+            errorResult.SummaryMessage = $"❌ ไม่สามารถค้นหาข้อมูลได้: {ex.Message}"
+
+            Return errorResult
+        End Try
+    End Function
+
+    ''' <summary>
     ''' ค้นหาไฟล์ในโฟลเดอร์ตามชื่อที่กำหนด
     ''' </summary>
     Private Function SearchFilesInDirectory(fileName As String) As FileSearchResult
@@ -871,7 +1039,7 @@ Public Class frmHistory
             End If
 
             ' โฟลเดอร์หลักที่จะค้นหา
-            Dim baseFolderPath As String = "\\fls951\OAFAB\OA2FAB\Film charecter check"
+            Dim baseFolderPath As String = "\\10.24.179.2\OAFAB\OA2FAB\Film charecter check"
 
             ' ตรวจสอบว่าโฟลเดอร์หลักมีอยู่จริงหรือไม่
             If Not Directory.Exists(baseFolderPath) Then
@@ -920,7 +1088,7 @@ Public Class frmHistory
                             Dim fileDetail As New FileDetail() With {
                             .FileName = Path.GetFileName(filePath),
                             .FullPath = filePath,
-                            .RelativePath = GetRelativePath("\\fls951\OAFAB\OA2FAB\20250607 Pimploy S", filePath),
+                            .RelativePath = GetRelativePath("\\10.24.179.2\OAFAB\OA2FAB\20250607 Pimploy S", filePath),
                             .FileSize = fileInfo.Length,
                             .LastModified = fileInfo.LastWriteTime
                         }
@@ -1052,7 +1220,7 @@ Public Class frmHistory
             txtDetail.Font = New System.Drawing.Font("Segoe UI", 10)
             txtDetail.Text = $"รหัสผลิตภัณฑ์: {record.ProductCode}{Environment.NewLine}" &
                            $"รหัสอ้างอิง: {record.ReferenceCode}{Environment.NewLine}" &
-                           $"วันที่/เวลาสแกน: {record.ScanDateTime}{Environment.NewLine}" &
+                           $"วันที่สแกน: {record.ScanDateTime:dd/MM/yyyy HH:mm:ss}{Environment.NewLine}" &
                            $"จำนวน: {record.Quantity}{Environment.NewLine}" &
                            $"วันที่ผลิต: {record.DateCode}{Environment.NewLine}" &
                            $"สถานะ: {If(record.IsValid, "ถูกต้อง", "ไม่ถูกต้อง")}{Environment.NewLine}" &
@@ -1102,12 +1270,12 @@ Public Class frmHistory
             ' ยืนยันการลบ
             Dim result As System.Windows.Forms.DialogResult = MessageBox.Show($"คุณต้องการลบรายการนี้ใช่หรือไม่?{Environment.NewLine}{Environment.NewLine}" &
                                                       $"รหัสผลิตภัณฑ์: {record.ProductCode}{Environment.NewLine}" &
-                                                      $"วันที่/เวลาสแกน: {record.ScanDateTime}",
+                                                      $"วันที่สแกน: {record.ScanDateTime}",
                                                       "ยืนยันการลบ", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Warning)
 
             If result = System.Windows.Forms.DialogResult.Yes Then
                 ' ลบข้อมูลจากฐานข้อมูล
-                Dim success As Boolean = DatabaseManager.DeleteScanRecord(record.Id)
+                Dim success As Boolean = AccessDatabaseManager.DeleteScanRecord(record.Id)
 
                 If success Then
                     ' ลบออกจากรายการในหน้าจอ
@@ -1216,12 +1384,12 @@ Public Class frmHistory
                 lblCount.Text = "กำลังส่งออกข้อมูล..."
 
                 ' สร้าง Excel Application
-                Dim excelApp As New Microsoft.Office.Interop.Excel.Application()
+                Dim excelApp As New Excel.Application()
                 excelApp.Visible = False
 
                 ' สร้าง Workbook
-                Dim workbook As Microsoft.Office.Interop.Excel.Workbook = excelApp.Workbooks.Add()
-                Dim worksheet As Microsoft.Office.Interop.Excel.Worksheet = CType(workbook.Worksheets(1), Microsoft.Office.Interop.Excel.Worksheet)
+                Dim workbook As Excel.Workbook = excelApp.Workbooks.Add()
+                Dim worksheet As Excel.Worksheet = CType(workbook.Worksheets(1), Excel.Worksheet)
 
                 ' ตั้งชื่อ Sheet
                 worksheet.Name = "ประวัติการสแกน"
@@ -1239,7 +1407,7 @@ Public Class frmHistory
                 worksheet.Cells(1, 10) = "ข้อมูลต้นฉบับ"
 
                 ' จัดรูปแบบหัวตาราง
-                Dim headerRange As Microsoft.Office.Interop.Excel.Range = worksheet.Range("A1:J1")
+                Dim headerRange As Excel.Range = worksheet.Range("A1:J1")
                 headerRange.Font.Bold = True
                 headerRange.Interior.Color = RGB(52, 152, 219)
                 headerRange.Font.Color = RGB(255, 255, 255)
@@ -1306,7 +1474,11 @@ Public Class frmHistory
         End Try
     End Sub
 
-    Private Sub ReleaseObject(ByVal obj As Object)
+    ''' <summary>
+    ''' คืนทรัพยากร COM object
+    ''' </summary>
+    ''' <param name="obj">COM object ที่ต้องการคืนทรัพยากร</param>
+    Private Sub ReleaseObject(obj As Object)
         Try
             If obj IsNot Nothing Then
                 System.Runtime.InteropServices.Marshal.ReleaseComObject(obj)
@@ -1314,8 +1486,10 @@ Public Class frmHistory
             End If
         Catch ex As Exception
             obj = Nothing
+            Console.WriteLine($"Error releasing COM object: {ex.Message}")
         Finally
             GC.Collect()
+            GC.WaitForPendingFinalizers()
         End Try
     End Sub
 
@@ -1344,22 +1518,6 @@ Public Class frmHistory
         Catch ex As Exception
             MessageBox.Show($"ไม่สามารถเปิดไฟล์หรือโฟลเดอร์ได้:{vbNewLine}{ex.Message}",
                           "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-
-            ' วิธีที่ 2: พยายามเปิดโฟลเดอร์และเลือกไฟล์ (สำหรับกรณีที่เป็นไฟล์เท่านั้น)
-            Try
-                If System.IO.File.Exists(filePath) Then
-                    Dim explorerPath As String = System.IO.Path.GetDirectoryName(filePath)
-                    If System.IO.Directory.Exists(explorerPath) Then
-                        System.Diagnostics.Process.Start("explorer.exe", "/select," & filePath)
-                    End If
-                ElseIf System.IO.Directory.Exists(System.IO.Path.GetDirectoryName(filePath)) Then
-                    ' ถ้าไฟล์ไม่มี แต่โฟลเดอร์พ่อแม่มี ให้เปิดโฟลเดอร์พ่อแม่
-                    System.Diagnostics.Process.Start("explorer.exe", """" & System.IO.Path.GetDirectoryName(filePath) & """")
-                End If
-            Catch ex2 As Exception
-                MessageBox.Show($"ไม่สามารถเปิดโฟลเดอร์ได้:{vbNewLine}{ex2.Message}",
-                              "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            End Try
         End Try
     End Sub
 #End Region
@@ -1372,5 +1530,4 @@ Public Class frmHistory
         Public Property ErrorMessage As String = ""
     End Class
 #End Region
-
 End Class

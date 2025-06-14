@@ -16,6 +16,7 @@ Public Class ScanDataRecord
     Private _userName As String
     Private _extractedData As String
     Private _validationMessages As String
+    Private _missionStatus As String = "ไม่มี" ' สถานะ Mission: "ไม่มี", "รอดำเนินการ", "สำเร็จ"
 
     ''' <summary>
     ''' ID ของรายการในฐานข้อมูล
@@ -162,6 +163,18 @@ Public Class ScanDataRecord
     End Property
 
     ''' <summary>
+    ''' สถานะ Mission
+    ''' </summary>
+    Public Property MissionStatus() As String
+        Get
+            Return _missionStatus
+        End Get
+        Set(value As String)
+            _missionStatus = value
+        End Set
+    End Property
+
+    ''' <summary>
     ''' สร้าง constructor เริ่มต้น
     ''' </summary>
     Public Sub New()
@@ -169,6 +182,7 @@ Public Class ScanDataRecord
         _scanDateTime = DateTime.Now
         _computerName = Environment.MachineName
         _userName = Environment.UserName
+        _missionStatus = "ไม่มี"
     End Sub
 
     ''' <summary>
