@@ -149,65 +149,6 @@ Public Class AccessDatabaseManager
     End Sub
 
     ''' <summary>
-    ''' สร้างตารางในฐานข้อมูลถ้ายังไม่มี
-    ''' </summary>
-    Public Shared Sub CreateTablesIfNotExists()
-        Try
-            Using conn As New OleDbConnection(ConnectionString)
-                conn.Open()
-
-                ' ตรวจสอบว่ามีตาราง ScanRecords หรือไม่
-                Dim tableExists As Boolean = False
-
-                Try
-                    Dim tables As DataTable = conn.GetSchema("Tables")
-                    For Each row As DataRow In tables.Rows
-                        If row("TABLE_NAME").ToString().Equals("ScanRecords", StringComparison.OrdinalIgnoreCase) Then
-                            tableExists = True
-                            Exit For
-                        End If
-                    Next
-                Catch ex As Exception
-                    Console.WriteLine($"Error checking table existence: {ex.Message}")
-                    tableExists = False
-                End Try
-
-                ' สร้างตาราง ScanRecords ถ้ายังไม่มี
-                If Not tableExists Then
-                    Dim createTableSql As String =
-                        "CREATE TABLE ScanRecords (" &
-                        "Id AUTOINCREMENT PRIMARY KEY, " &
-                        "ScanDateTime DATETIME NOT NULL, " &
-                        "ProductCode TEXT(255), " &
-                        "ReferenceCode TEXT(255), " &
-                        "Quantity INTEGER, " &
-                        "DateCode TEXT(255), " &
-                        "IsValid YESNO, " &
-                        "OriginalData MEMO, " &
-                        "ExtractedData MEMO, " &
-                        "ValidationMessages MEMO, " &
-                        "ComputerName TEXT(255), " &
-                        "UserName TEXT(255), " &
-                        "MissionStatus TEXT(50) DEFAULT 'ไม่มี'" &
-                        ")"
-
-                    Using createCmd As New OleDbCommand(createTableSql, conn)
-                        createCmd.ExecuteNonQuery()
-                        Console.WriteLine("ScanRecords table created successfully")
-                    End Using
-                End If
-
-                conn.Close()
-            End Using
-
-            Console.WriteLine("Tables created or already exist")
-        Catch ex As Exception
-            Console.WriteLine($"Error creating tables: {ex.Message}")
-            Throw New Exception($"ไม่สามารถสร้างตารางในฐานข้อมูลได้: {ex.Message}", ex)
-        End Try
-    End Sub
-
-    ''' <summary>
     ''' บันทึกข้อมูลการสแกน
     ''' </summary>
     ''' <param name="record">ข้อมูลการสแกน</param>
@@ -336,90 +277,6 @@ Public Class AccessDatabaseManager
             Console.WriteLine($"General error adding scan record: {ex.Message}")
             Console.WriteLine($"Stack trace: {ex.StackTrace}")
             Throw New Exception($"ไม่สามารถเพิ่มข้อมูลการสแกนได้: {ex.Message}", ex)
-        End Try
-    End Function
-
-    ''' <summary>
-    ''' ดึงข้อมูลประวัติการสแกนทั้งหมด
-    ''' </summary>
-    ''' <param name="limit">จำนวนรายการสูงสุดที่ต้องการดึง</param>
-    ''' <returns>รายการข้อมูลการสแกน</returns>
-    Public Shared Function GetScanHistory(Optional limit As Integer = 1000) As List(Of ScanDataRecord)
-        Try
-            Dim results As New List(Of ScanDataRecord)()
-
-            Using conn As New OleDbConnection(ConnectionString)
-                conn.Open()
-
-                ' ตรวจสอบว่ามีคอลัมน์ MissionStatus หรือไม่
-                Dim hasMissionStatusColumn As Boolean = False
-                Try
-                    Dim schema As DataTable = conn.GetSchema("Columns", New String() {Nothing, Nothing, "ScanRecords", "MissionStatus"})
-                    hasMissionStatusColumn = schema.Rows.Count > 0
-                Catch ex As Exception
-                    Console.WriteLine($"Error checking MissionStatus column: {ex.Message}")
-                    hasMissionStatusColumn = False
-                End Try
-
-                ' ถ้าไม่มีคอลัมน์ MissionStatus ให้เพิ่มคอลัมน์
-                If Not hasMissionStatusColumn Then
-                    Try
-                        Using alterCmd As New OleDbCommand("ALTER TABLE ScanRecords ADD COLUMN MissionStatus TEXT(50) DEFAULT 'ไม่มี'", conn)
-                            alterCmd.ExecuteNonQuery()
-                            Console.WriteLine("Added MissionStatus column to ScanRecords table")
-                        End Using
-                    Catch ex As Exception
-                        Console.WriteLine($"Error adding MissionStatus column: {ex.Message}")
-                        ' ถ้าไม่สามารถเพิ่มคอลัมน์ได้ ให้ข้ามไปและดึงข้อมูลต่อ
-                    End Try
-                End If
-
-                ' Access ใช้ TOP แทน LIMIT
-                Dim selectSql As String = If(limit > 0,
-                    $"SELECT TOP {limit} * FROM ScanRecords ORDER BY ScanDateTime DESC",
-                    "SELECT * FROM ScanRecords ORDER BY ScanDateTime DESC")
-
-                Using selectCmd As New OleDbCommand(selectSql, conn)
-                    Using reader As OleDbDataReader = selectCmd.ExecuteReader()
-                        While reader.Read()
-                            Dim record As New ScanDataRecord()
-
-                            record.Id = Convert.ToInt32(reader("Id"))
-                            record.ScanDateTime = Convert.ToDateTime(reader("ScanDateTime"))
-                            record.ProductCode = If(reader("ProductCode") IsNot DBNull.Value, reader("ProductCode").ToString(), "")
-                            record.ReferenceCode = If(reader("ReferenceCode") IsNot DBNull.Value, reader("ReferenceCode").ToString(), "")
-                            record.Quantity = If(reader("Quantity") IsNot DBNull.Value, Convert.ToInt32(reader("Quantity")), 0)
-                            record.DateCode = If(reader("DateCode") IsNot DBNull.Value, reader("DateCode").ToString(), "")
-                            record.IsValid = Convert.ToBoolean(reader("IsValid"))
-                            record.OriginalData = If(reader("OriginalData") IsNot DBNull.Value, reader("OriginalData").ToString(), "")
-                            record.ExtractedData = If(reader("ExtractedData") IsNot DBNull.Value, reader("ExtractedData").ToString(), "")
-                            record.ValidationMessages = If(reader("ValidationMessages") IsNot DBNull.Value, reader("ValidationMessages").ToString(), "")
-                            record.ComputerName = If(reader("ComputerName") IsNot DBNull.Value, reader("ComputerName").ToString(), "")
-                            record.UserName = If(reader("UserName") IsNot DBNull.Value, reader("UserName").ToString(), "")
-
-                            ' ดึงข้อมูลสถานะ Mission ถ้ามีคอลัมน์
-                            If hasMissionStatusColumn Then
-                                Try
-                                    record.MissionStatus = If(reader("MissionStatus") IsNot DBNull.Value, reader("MissionStatus").ToString(), "ไม่มี")
-                                Catch
-                                    record.MissionStatus = "ไม่มี"
-                                End Try
-                            Else
-                                record.MissionStatus = "ไม่มี"
-                            End If
-
-                            results.Add(record)
-                        End While
-                    End Using
-                End Using
-            End Using
-
-            Console.WriteLine($"Retrieved {results.Count} scan records")
-            Return results
-
-        Catch ex As Exception
-            Console.WriteLine($"Error getting scan history: {ex.Message}")
-            Throw New Exception($"ไม่สามารถดึงข้อมูลประวัติการสแกนได้: {ex.Message}", ex)
         End Try
     End Function
 
@@ -723,6 +580,213 @@ Public Class AccessDatabaseManager
             Return False
         End Try
     End Function
+
+        ' ใน AccessDatabaseManager.vb - เพิ่มฟังก์ชั่นสำหรับจัดการคอลัมน์ RelatedFilePath
+
+''' <summary>
+''' เพิ่มคอลัมน์ RelatedFilePath ในตาราง ScanRecords ถ้ายังไม่มี
+''' </summary>
+Public Shared Sub AddRelatedFilePathColumnIfNotExists()
+    Try
+        Using conn As New OleDbConnection(ConnectionString)
+            conn.Open()
+            
+            ' ตรวจสอบว่ามีคอลัมน์ RelatedFilePath หรือไม่
+            Dim columnExists As Boolean = False
+            Try
+                Dim schema As DataTable = conn.GetSchema("Columns", New String() {Nothing, Nothing, "ScanRecords", "RelatedFilePath"})
+                columnExists = schema.Rows.Count > 0
+            Catch ex As Exception
+                Console.WriteLine($"Error checking RelatedFilePath column: {ex.Message}")
+                columnExists = False
+            End Try
+            
+            ' ถ้าไม่มีคอลัมน์ RelatedFilePath ให้เพิ่มคอลัมน์
+            If Not columnExists Then
+                Try
+                    Using alterCmd As New OleDbCommand("ALTER TABLE ScanRecords ADD COLUMN RelatedFilePath MEMO", conn)
+                        alterCmd.ExecuteNonQuery()
+                        Console.WriteLine("Added RelatedFilePath column to ScanRecords table")
+                    End Using
+                Catch ex As Exception
+                    Console.WriteLine($"Error adding RelatedFilePath column: {ex.Message}")
+                    Throw
+                End Try
+            Else
+                Console.WriteLine("RelatedFilePath column already exists")
+            End If
+            
+        End Using
+    Catch ex As Exception
+        Console.WriteLine($"Error in AddRelatedFilePathColumnIfNotExists: {ex.Message}")
+        Throw New Exception($"ไม่สามารถเพิ่มคอลัมน์ RelatedFilePath ได้: {ex.Message}", ex)
+    End Try
+End Sub
+
+''' <summary>
+''' อัปเดต RelatedFilePath ของรายการสแกน
+''' </summary>
+''' <param name="recordId">ID ของรายการที่ต้องการอัปเดต</param>
+''' <param name="filePath">เส้นทางไฟล์ที่เกี่ยวข้อง</param>
+''' <returns>True ถ้าอัปเดตสำเร็จ, False ถ้าไม่สำเร็จ</returns>
+Public Shared Function UpdateRelatedFilePath(recordId As Integer, filePath As String) As Boolean
+    Try
+        Using conn As New OleDbConnection(ConnectionString)
+            conn.Open()
+            
+            ' ตรวจสอบและเพิ่มคอลัมน์ถ้าจำเป็น
+            AddRelatedFilePathColumnIfNotExists()
+            
+            ' อัปเดต RelatedFilePath
+            Using updateCmd As New OleDbCommand("UPDATE ScanRecords SET RelatedFilePath = ? WHERE Id = ?", conn)
+                updateCmd.Parameters.AddWithValue("@FilePath", If(String.IsNullOrEmpty(filePath), DBNull.Value, filePath))
+                updateCmd.Parameters.AddWithValue("@Id", recordId)
+                
+                Dim rowsAffected As Integer = updateCmd.ExecuteNonQuery()
+                
+                If rowsAffected > 0 Then
+                    Console.WriteLine($"Updated RelatedFilePath for record ID {recordId}: {filePath}")
+                    Return True
+                Else
+                    Console.WriteLine($"No record found with ID {recordId} to update RelatedFilePath")
+                    Return False
+                End If
+            End Using
+        End Using
+        
+    Catch ex As Exception
+        Console.WriteLine($"Error updating RelatedFilePath: {ex.Message}")
+        Return False
+    End Try
+End Function
+
+''' <summary>
+''' อัปเดต CreateTablesIfNotExists เพื่อรวมคอลัมน์ RelatedFilePath ในการสร้างตารางใหม่
+''' </summary>
+Public Shared Sub CreateTablesIfNotExists()
+    Try
+        Using conn As New OleDbConnection(ConnectionString)
+            conn.Open()
+
+            ' ตรวจสอบว่ามีตาราง ScanRecords หรือไม่
+            Dim tableExists As Boolean = False
+
+            Try
+                Dim tables As DataTable = conn.GetSchema("Tables")
+                For Each row As DataRow In tables.Rows
+                    If row("TABLE_NAME").ToString().Equals("ScanRecords", StringComparison.OrdinalIgnoreCase) Then
+                        tableExists = True
+                        Exit For
+                    End If
+                Next
+            Catch ex As Exception
+                Console.WriteLine($"Error checking table existence: {ex.Message}")
+                tableExists = False
+            End Try
+
+            ' สร้างตาราง ScanRecords ถ้ายังไม่มี (รวมคอลัมน์ RelatedFilePath)
+            If Not tableExists Then
+                Dim createTableSql As String =
+                    "CREATE TABLE ScanRecords (" &
+                    "Id AUTOINCREMENT PRIMARY KEY, " &
+                    "ScanDateTime DATETIME NOT NULL, " &
+                    "ProductCode TEXT(255), " &
+                    "ReferenceCode TEXT(255), " &
+                    "Quantity INTEGER, " &
+                    "DateCode TEXT(255), " &
+                    "IsValid YESNO, " &
+                    "OriginalData MEMO, " &
+                    "ExtractedData MEMO, " &
+                    "ValidationMessages MEMO, " &
+                    "ComputerName TEXT(255), " &
+                    "UserName TEXT(255), " &
+                    "MissionStatus TEXT(50) DEFAULT 'ไม่มี', " &
+                    "RelatedFilePath MEMO" &
+                    ")"
+
+                Using createCmd As New OleDbCommand(createTableSql, conn)
+                    createCmd.ExecuteNonQuery()
+                    Console.WriteLine("ScanRecords table created successfully with RelatedFilePath column")
+                End Using
+            Else
+                ' ถ้าตารางมีอยู่แล้ว ให้ตรวจสอบและเพิ่มคอลัมน์ที่ขาดหาย
+                AddRelatedFilePathColumnIfNotExists()
+            End If
+
+            conn.Close()
+        End Using
+
+        Console.WriteLine("Tables created or updated successfully")
+    Catch ex As Exception
+        Console.WriteLine($"Error creating/updating tables: {ex.Message}")
+        Throw New Exception($"ไม่สามารถสร้างหรืออัปเดตตารางในฐานข้อมูลได้: {ex.Message}", ex)
+    End Try
+End Sub
+
+''' <summary>
+''' อัปเดต GetScanHistory เพื่อรวมคอลัมน์ RelatedFilePath
+''' </summary>
+Public Shared Function GetScanHistory(Optional limit As Integer = 1000) As List(Of ScanDataRecord)
+    Try
+        Dim results As New List(Of ScanDataRecord)()
+
+        Using conn As New OleDbConnection(ConnectionString)
+            conn.Open()
+
+            ' ตรวจสอบและเพิ่มคอลัมน์ที่ขาดหาย
+            AddRelatedFilePathColumnIfNotExists()
+
+            ' Access ใช้ TOP แทน LIMIT
+            Dim selectSql As String = If(limit > 0,
+                $"SELECT TOP {limit} * FROM ScanRecords ORDER BY ScanDateTime DESC",
+                "SELECT * FROM ScanRecords ORDER BY ScanDateTime DESC")
+
+            Using selectCmd As New OleDbCommand(selectSql, conn)
+                Using reader As OleDbDataReader = selectCmd.ExecuteReader()
+                    While reader.Read()
+                        Dim record As New ScanDataRecord()
+
+                        record.Id = Convert.ToInt32(reader("Id"))
+                        record.ScanDateTime = Convert.ToDateTime(reader("ScanDateTime"))
+                        record.ProductCode = If(reader("ProductCode") IsNot DBNull.Value, reader("ProductCode").ToString(), "")
+                        record.ReferenceCode = If(reader("ReferenceCode") IsNot DBNull.Value, reader("ReferenceCode").ToString(), "")
+                        record.Quantity = If(reader("Quantity") IsNot DBNull.Value, Convert.ToInt32(reader("Quantity")), 0)
+                        record.DateCode = If(reader("DateCode") IsNot DBNull.Value, reader("DateCode").ToString(), "")
+                        record.IsValid = Convert.ToBoolean(reader("IsValid"))
+                        record.OriginalData = If(reader("OriginalData") IsNot DBNull.Value, reader("OriginalData").ToString(), "")
+                        record.ExtractedData = If(reader("ExtractedData") IsNot DBNull.Value, reader("ExtractedData").ToString(), "")
+                        record.ValidationMessages = If(reader("ValidationMessages") IsNot DBNull.Value, reader("ValidationMessages").ToString(), "")
+                        record.ComputerName = If(reader("ComputerName") IsNot DBNull.Value, reader("ComputerName").ToString(), "")
+                        record.UserName = If(reader("UserName") IsNot DBNull.Value, reader("UserName").ToString(), "")
+                        
+                        ' MissionStatus - ตรวจสอบว่ามีคอลัมน์หรือไม่
+                        Try
+                            record.MissionStatus = If(reader("MissionStatus") IsNot DBNull.Value, reader("MissionStatus").ToString(), "ไม่มี")
+                        Catch
+                            record.MissionStatus = "ไม่มี"
+                        End Try
+                        
+                        ' RelatedFilePath - ตรวจสอบว่ามีคอลัมน์หรือไม่
+                        Try
+                            record.RelatedFilePath = If(reader("RelatedFilePath") IsNot DBNull.Value, reader("RelatedFilePath").ToString(), "")
+                        Catch
+                            record.RelatedFilePath = ""
+                        End Try
+
+                        results.Add(record)
+                    End While
+                End Using
+            End Using
+        End Using
+
+        Console.WriteLine($"Retrieved {results.Count} scan records from database")
+        Return results
+
+    Catch ex As Exception
+        Console.WriteLine($"Error retrieving scan history: {ex.Message}")
+        Return New List(Of ScanDataRecord)()
+    End Try
+End Function
 
 End Class
 
