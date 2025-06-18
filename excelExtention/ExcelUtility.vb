@@ -1651,7 +1651,7 @@ Public Class ExcelUtility
         Dim result As New ExcelSearchResult() With {
             .IsSuccess = True,
             .SearchedProductCode = productCode,
-            .ExcelFilePath = "\\fls951\OAFAB\OA2FAB\Film charecter check\Database.xlsx",
+                            .ExcelFilePath = NetworkPathManager.GetExcelDatabasePath(),
             .MatchCount = 1
         }
 
@@ -1700,7 +1700,7 @@ Public Class ExcelUtility
 
             Dim excelApp As New Microsoft.Office.Interop.Excel.Application()
             Dim version As String = excelApp.Version
-            excelApp.Quit()
+            excelApp.Quit() 
             Marshal.ReleaseComObject(excelApp)
 
             Return $"✅ Microsoft Excel เวอร์ชัน {version} พร้อมใช้งาน"

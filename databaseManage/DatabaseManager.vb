@@ -108,7 +108,7 @@ Public Class DatabaseManager
             LoadDatabaseSettings()
 
             ' ส่งค่าการตั้งค่าไปยัง AccessDatabaseManager
-            AccessDatabaseManager.SetDatabasePath(_databasePath)
+            ' หมายเหตุ: ตอนนี้ใช้ NetworkPathManager แล้ว ไม่ต้องตั้งค่า path เอง
             AccessDatabaseManager.SetDatabasePassword(_password)
 
             Return AccessDatabaseManager.Initialize()

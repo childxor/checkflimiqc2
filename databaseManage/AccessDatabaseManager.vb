@@ -13,16 +13,30 @@ Public Class AccessDatabaseManager
     ' กำหนดพาธของไฟล์การตั้งค่า
     Private Shared ReadOnly CONFIG_FILE As String = "Settings.config"
 
-    ' กำหนดพาธของฐานข้อมูล Access
-    Private Shared _databasePath As String = "\\fls951\OAFAB\OA2FAB\Film charecter check\dbSystems\QRCodeScanner.accdb"
+    ' กำหนดพาธของฐานข้อมูล Access - ใช้ NetworkPathManager
     Private Shared _password As String = "" ' รหัสผ่านฐานข้อมูล (ถ้ามี)
+    
+    ''' <summary>
+    ''' ได้รับพาธฐานข้อมูลปัจจุบันตาม network ที่เชื่อมต่อ
+    ''' </summary>
+    Public Shared ReadOnly Property DatabasePath As String
+        Get
+            Dim networkPath = NetworkPathManager.GetAccessDatabasePath()
+            If Not String.IsNullOrEmpty(networkPath) Then
+                Return networkPath
+            End If
+            
+            ' ถ้าไม่พบ network ให้ใช้พาธเดิมเพื่อแสดงข้อผิดพลาด
+            Return "\\fls951\OAFAB\OA2FAB\Film charecter check\dbSystems\QRCodeScanner.accdb"
+        End Get
+    End Property
 
     ''' <summary>
     ''' Connection string สำหรับเชื่อมต่อฐานข้อมูล Access
     ''' </summary>
     Public Shared ReadOnly Property ConnectionString As String
         Get
-            Dim connectionStrings As String = $"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={_databasePath};"
+            Dim connectionStrings As String = $"Provider=Microsoft.ACE.OLEDB.12.0;Data Source={DatabasePath};"
 
             ' เพิ่มรหัสผ่านถ้ามี
             If Not String.IsNullOrEmpty(_password) Then
@@ -53,15 +67,20 @@ Public Class AccessDatabaseManager
     End Function
 
     ''' <summary>
-    ''' ตั้งค่าพาธของฐานข้อมูล
+    ''' ตรวจสอบสถานะการเชื่อมต่อ network และแสดงข้อมูล
     ''' </summary>
-    ''' <param name="path">พาธของไฟล์ฐานข้อมูล</param>
-    Public Shared Sub SetDatabasePath(path As String)
-        If Not String.IsNullOrEmpty(path) Then
-            _databasePath = path
-            Console.WriteLine($"Database path set to: {_databasePath}")
-        End If
-    End Sub
+    ''' <returns>ข้อความสถานะ network</returns>
+    Public Shared Function GetNetworkStatus() As String
+        Return NetworkPathManager.GetNetworkStatus()
+    End Function
+    
+    ''' <summary>
+    ''' ตรวจสอบว่าพาธฐานข้อมูลมีอยู่หรือไม่
+    ''' </summary>
+    ''' <returns>True ถ้าพาธมีอยู่, False ถ้าไม่มี</returns>
+    Public Shared Function DatabasePathExists() As Boolean
+        Return NetworkPathManager.PathExists(DatabasePath)
+    End Function
 
     ''' <summary>
     ''' ตั้งค่ารหัสผ่านของฐานข้อมูล
@@ -78,10 +97,19 @@ Public Class AccessDatabaseManager
     ''' <returns>True ถ้าเริ่มต้นสำเร็จ, False ถ้าเริ่มต้นไม่สำเร็จ</returns>
     Public Shared Function Initialize() As Boolean
         Try
-            Console.WriteLine($"Initializing database with path: {_databasePath}")
+            Console.WriteLine($"Initializing database with path: {DatabasePath}")
+            
+            ' ตรวจสอบการเชื่อมต่อ network ก่อน
+            Dim networkResult = NetworkPathManager.CheckNetworkConnection()
+            If Not networkResult.IsConnected Then
+                Console.WriteLine($"Network connection failed: {networkResult.ErrorMessage}")
+                Return False
+            End If
+            
+            Console.WriteLine($"Connected to {networkResult.NetworkType} network ({networkResult.ServerIP})")
 
             ' สร้างฐานข้อมูลใหม่ถ้ายังไม่มี
-            If Not File.Exists(_databasePath) Then
+            If Not File.Exists(DatabasePath) Then
                 Console.WriteLine("Database file not found, creating new database...")
                 CreateNewDatabase()
             End If
@@ -102,7 +130,7 @@ Public Class AccessDatabaseManager
     Private Shared Sub CreateNewDatabase()
         Try
             ' สร้างโฟลเดอร์ถ้ายังไม่มี
-            Dim directory As String = Path.GetDirectoryName(_databasePath)
+            Dim directory As String = Path.GetDirectoryName(DatabasePath)
             If Not IO.Directory.Exists(directory) Then
                 IO.Directory.CreateDirectory(directory)
             End If
@@ -113,7 +141,7 @@ Public Class AccessDatabaseManager
                 Dim catalog As Object = CreateObject("ADOX.Catalog")
                 catalog.Create(ConnectionString)
                 catalog = Nothing
-                Console.WriteLine($"Access database created successfully: {_databasePath}")
+                Console.WriteLine($"Access database created successfully: {DatabasePath}")
             Catch adoxEx As Exception
                 Console.WriteLine($"ADOX method failed: {adoxEx.Message}")
 
@@ -133,7 +161,7 @@ Public Class AccessDatabaseManager
     Private Shared Sub CreateDatabaseWithOleDb()
         Try
             ' สร้างไฟล์ .accdb เปล่า
-            File.WriteAllBytes(_databasePath, New Byte() {})
+            File.WriteAllBytes(DatabasePath, New Byte() {})
 
             ' ลองเชื่อมต่อเพื่อ initialize
             Using conn As New OleDbConnection(ConnectionString)
@@ -141,7 +169,7 @@ Public Class AccessDatabaseManager
                 conn.Close()
             End Using
 
-            Console.WriteLine($"Database created with OleDb method: {_databasePath}")
+            Console.WriteLine($"Database created with OleDb method: {DatabasePath}")
         Catch ex As Exception
             Console.WriteLine($"OleDb creation method also failed: {ex.Message}")
             Throw
@@ -338,7 +366,7 @@ Public Class AccessDatabaseManager
                     updateCmd.Parameters.AddWithValue("@Id", record.Id)
 
                     Dim rowsAffected As Integer = updateCmd.ExecuteNonQuery()
-
+ 
                     Console.WriteLine($"Updated scan record ID {record.Id}, rows affected: {rowsAffected}")
                     Return rowsAffected > 0
                 End Using
@@ -448,7 +476,7 @@ Public Class AccessDatabaseManager
     ''' <returns>True ถ้าสำรองสำเร็จ</returns>
     Public Shared Function BackupDatabase(backupPath As String) As Boolean
         Try
-            If File.Exists(_databasePath) Then
+            If File.Exists(DatabasePath) Then
                 ' สร้างโฟลเดอร์ backup ถ้ายังไม่มี
                 Dim backupDir As String = Path.GetDirectoryName(backupPath)
                 If Not Directory.Exists(backupDir) Then
@@ -456,7 +484,7 @@ Public Class AccessDatabaseManager
                 End If
 
                 ' คัดลอกไฟล์ฐานข้อมูล
-                File.Copy(_databasePath, backupPath, True)
+                File.Copy(DatabasePath, backupPath, True)
 
                 Console.WriteLine($"Database backed up to: {backupPath}")
                 Return True
@@ -479,13 +507,13 @@ Public Class AccessDatabaseManager
         Try
             If File.Exists(backupPath) Then
                 ' สำรองไฟล์ปัจจุบันก่อน (ถ้ามี)
-                If File.Exists(_databasePath) Then
-                    Dim currentBackup As String = _databasePath + ".old"
-                    File.Copy(_databasePath, currentBackup, True)
+                If File.Exists(DatabasePath) Then
+                    Dim currentBackup As String = DatabasePath + ".old"
+                    File.Copy(DatabasePath, currentBackup, True)
                 End If
 
                 ' คัดลอกไฟล์สำรองมาแทนที่
-                File.Copy(backupPath, _databasePath, True)
+                File.Copy(backupPath, DatabasePath, True)
 
                 Console.WriteLine($"Database restored from: {backupPath}")
                 Return True

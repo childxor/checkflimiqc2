@@ -18,7 +18,18 @@ Public Class frmHistory
     Private isLoading As Boolean = False
     Private backgroundWorker As System.ComponentModel.BackgroundWorker
     Private dataCache As ExcelDataCache
-    Private excelFilePath As String = "\\fls951\OAFAB\OA2FAB\Film charecter check\Database.xlsx"
+    ' ใช้ NetworkPathManager สำหรับจัดการพาธ Excel
+    Private ReadOnly Property ExcelFilePath As String
+        Get
+            Dim networkPath = NetworkPathManager.GetExcelDatabasePath()
+            If Not String.IsNullOrEmpty(networkPath) Then
+                Return networkPath
+            End If
+            
+            ' ถ้าไม่พบ network ให้ใช้พาธเดิมเพื่อแสดงข้อผิดพลาด
+            Return "\\fls951\OAFAB\OA2FAB\Film charecter check\Database.xlsx"
+        End Get
+    End Property
 #End Region
 
 #Region "Form Events"
@@ -1248,13 +1259,13 @@ Public Class frmHistory
             End If
 
             ' ตรวจสอบการเชื่อมต่อเครือข่าย
-            Dim networkResult As NetworkCheckResult = CheckNetworkConnection()
+            Dim networkResult As NetworkPathManager.NetworkCheckResult = CheckNetworkConnection()
             If Not networkResult.IsConnected OrElse networkResult.NetworkType <> "OA" Then
                 Return False
             End If
 
             ' ตรวจสอบว่าไฟล์ Excel มีอยู่หรือไม่
-            If Not File.Exists(excelFilePath) Then
+            If Not File.Exists(ExcelFilePath) Then
                 Return False
             End If
 
@@ -1299,13 +1310,13 @@ Public Class frmHistory
             End If
 
             ' ตรวจสอบการเชื่อมต่อเครือข่าย
-            Dim networkResult As NetworkCheckResult = CheckNetworkConnection()
+            Dim networkResult As NetworkPathManager.NetworkCheckResult = CheckNetworkConnection()
             If Not networkResult.IsConnected OrElse networkResult.NetworkType <> "OA" Then
                 Return False
             End If
 
             ' ตรวจสอบว่าไฟล์ Excel มีอยู่หรือไม่
-            If Not File.Exists(excelFilePath) Then
+            If Not File.Exists(ExcelFilePath) Then
                 Return False
             End If
 
@@ -1370,7 +1381,7 @@ Public Class frmHistory
             System.Windows.Forms.Application.DoEvents()
 
             ' ตรวจสอบการเชื่อมต่อเครือข่าย
-            Dim networkResult As NetworkCheckResult = CheckNetworkConnection()
+            Dim networkResult As NetworkPathManager.NetworkCheckResult = CheckNetworkConnection()
 
             statusForm.Close()
 
@@ -1460,7 +1471,7 @@ Public Class frmHistory
             End If
 
             ' ตรวจสอบการเชื่อมต่อเครือข่าย
-            Dim networkResult As NetworkCheckResult = CheckNetworkConnection()
+            Dim networkResult As NetworkPathManager.NetworkCheckResult = CheckNetworkConnection()
             If Not networkResult.IsConnected Then
                 result.CanCreate = False
                 result.Reason = $"ไม่สามารถเชื่อมต่อเครือข่ายได้{vbCrLf}{networkResult.ErrorMessage}"
@@ -1474,7 +1485,7 @@ Public Class frmHistory
             End If
 
             ' ตรวจสอบไฟล์ Excel
-            If Not File.Exists(excelFilePath) Then
+            If Not File.Exists(ExcelFilePath) Then
                 result.CanCreate = False
                 result.Reason = "ไม่พบไฟล์ Excel Database"
                 Return result
@@ -1539,66 +1550,29 @@ Public Class frmHistory
         End Try
     End Function
 
-    Private Function CheckNetworkConnection() As NetworkCheckResult
-        Dim result As New NetworkCheckResult()
-
-        Try
-            Dim ping As New Ping()
-
-            ' ทดสอบเครือข่าย OA ก่อน
-            Try
-                Dim replyOa As PingReply = ping.Send("10.24.179.2", 3000)
-                If replyOa.Status = IPStatus.Success Then
-                    result.IsConnected = True
-                    result.NetworkType = "OA"
-                    Return result
-                End If
-            Catch ex As Exception
-                Console.WriteLine($"OA network test failed: {ex.Message}")
-            End Try
-
-            ' ทดสอบเครือข่าย FAB
-            Try
-                Dim replyFab As PingReply = ping.Send("172.24.0.3", 3000)
-                If replyFab.Status = IPStatus.Success Then
-                    result.IsConnected = True
-                    result.NetworkType = "FAB"
-                    Return result
-                End If
-            Catch ex As Exception
-                Console.WriteLine($"FAB network test failed: {ex.Message}")
-                result.ErrorMessage = $"ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้: {ex.Message}"
-            End Try
-
-            result.IsConnected = False
-            If String.IsNullOrEmpty(result.ErrorMessage) Then
-                result.ErrorMessage = "ไม่สามารถเชื่อมต่อกับเครือข่าย OA หรือ FAB ได้"
-            End If
-
-        Catch ex As Exception
-            result.IsConnected = False
-            result.ErrorMessage = $"เกิดข้อผิดพลาดในการตรวจสอบเครือข่าย: {ex.Message}"
-        End Try
-
-        Return result
+    Private Function CheckNetworkConnection() As NetworkPathManager.NetworkCheckResult
+        ' ใช้ NetworkPathManager แทนการเขียนโค้ดซ้ำ
+        Return NetworkPathManager.CheckNetworkConnection()
     End Function
 
-    Private Sub HandleExcelFileAccess(productCode As String, networkResult As NetworkCheckResult)
+    Private Sub HandleExcelFileAccess(productCode As String, networkResult As NetworkPathManager.NetworkCheckResult)
         Try
-            If networkResult.NetworkType = "OA" Then
-                Dim excelPath As String = "\\10.24.179.2\OAFAB\OA2FAB\Film charecter check\Database.xlsx"
+            If networkResult.IsConnected Then
+                ' ใช้ NetworkPathManager เพื่อได้รับพาธที่ถูกต้อง
+                Dim excelPath As String = NetworkPathManager.GetExcelDatabasePath()
+
+                Console.WriteLine($"Excel path from {networkResult.NetworkType} network: {excelPath}")
 
                 If File.Exists(excelPath) Then
                     ' ค้นหาข้อมูลในไฟล์ Excel โดยใช้ฟังก์ชัน SearchProductInExcel จาก ExcelUtility
                     SearchAndDisplayExcelData(excelPath, productCode)
                 Else
-                    MessageBox.Show($"ไม่พบไฟล์ Excel ที่ต้องการ:{vbNewLine}{excelPath}",
+                    MessageBox.Show($"ไม่พบไฟล์ Excel ที่ต้องการ:{vbNewLine}{excelPath}{vbNewLine}เครือข่าย: {networkResult.NetworkType} ({networkResult.ServerIP})",
                                   "ตรวจสอบไฟล์ Excel", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning)
                 End If
-
-            ElseIf networkResult.NetworkType = "FAB" Then
-                MessageBox.Show("เครือข่าย FAB ไม่สามารถเข้าถึงไฟล์ Excel ได้{vbNewLine}กรุณาเชื่อมต่อกับเครือข่าย OA",
-                              "ตรวจสอบไฟล์ Excel", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information)
+            Else
+                MessageBox.Show($"ไม่สามารถเชื่อมต่อกับเครือข่ายได้{vbNewLine}ข้อผิดพลาด: {networkResult.ErrorMessage}",
+                              "ตรวจสอบไฟล์ Excel", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error)
             End If
 
         Catch ex As Exception
@@ -1648,7 +1622,7 @@ Public Class frmHistory
             If dataCache Is Nothing OrElse Not dataCache.IsLoaded Then
                 Return New ExcelUtility.ExcelSearchResult() With {
                 .SearchedProductCode = productCode,
-                .ExcelFilePath = excelFilePath,
+                .ExcelFilePath = ExcelFilePath,
                 .IsSuccess = False,
                 .ErrorMessage = "ข้อมูล Excel ยังไม่ได้โหลด",
                 .SummaryMessage = "❌ ข้อมูล Excel ยังไม่พร้อม กรุณารอการโหลดให้เสร็จสิ้น"
@@ -1658,7 +1632,7 @@ Public Class frmHistory
             If String.IsNullOrWhiteSpace(productCode) Then
                 Return New ExcelUtility.ExcelSearchResult() With {
                 .SearchedProductCode = "",
-                .ExcelFilePath = excelFilePath,
+                .ExcelFilePath = ExcelFilePath,
                 .IsSuccess = False,
                 .ErrorMessage = "ไม่มีรหัสผลิตภัณฑ์ที่ต้องการค้นหา",
                 .SummaryMessage = "❌ กรุณาใส่รหัสผลิตภัณฑ์ที่ต้องการค้นหา"
@@ -1677,7 +1651,7 @@ Public Class frmHistory
             Console.WriteLine($"Error in SearchInExcelCache: {ex.Message}")
             Return New ExcelUtility.ExcelSearchResult() With {
             .SearchedProductCode = productCode,
-            .ExcelFilePath = excelFilePath,
+            .ExcelFilePath = ExcelFilePath,
             .IsSuccess = False,
             .ErrorMessage = $"เกิดข้อผิดพลาดในการค้นหา: {ex.Message}",
             .SummaryMessage = "❌ เกิดข้อผิดพลาดในการค้นหา"
@@ -1911,8 +1885,19 @@ Public Class frmHistory
     ''' ค้นหาข้อมูลในไฟล์ Excel โดยใช้ ExcelUtility
     ''' </summary>
     Private Function SearchProductInExcel(productCode As String) As ExcelUtility.ExcelSearchResult
-        ' กำหนดเส้นทางไฟล์ Excel
-        Dim excelFilePath As String = "\\10.24.179.2\OAFAB\OA2FAB\Film charecter check\Database.xlsx"
+        ' ใช้ NetworkPathManager เพื่อได้รับเส้นทางไฟล์ Excel ที่ถูกต้อง
+        Dim excelFilePath As String = NetworkPathManager.GetExcelDatabasePath()
+
+        ' ตรวจสอบว่าได้รับพาธหรือไม่
+        If String.IsNullOrEmpty(excelFilePath) Then
+            ' สร้าง result แสดงข้อผิดพลาด network
+            Dim networkResult As New ExcelUtility.ExcelSearchResult()
+            networkResult.SearchedProductCode = productCode
+            networkResult.IsSuccess = False
+            networkResult.ErrorMessage = "ไม่สามารถเชื่อมต่อกับเครือข่าย OA หรือ FAB ได้"
+            networkResult.SummaryMessage = "❌ ไม่สามารถเชื่อมต่อกับเครือข่าย"
+            Return networkResult
+        End If
 
         ' เรียกใช้งานฟังก์ชัน SearchProductInExcel จากคลาส ExcelUtility
         Try
@@ -1945,8 +1930,14 @@ Public Class frmHistory
                 Return result
             End If
 
-            ' โฟลเดอร์หลักที่จะค้นหา
-            Dim baseFolderPath As String = "\\10.24.179.2\OAFAB\OA2FAB\Film charecter check"
+            ' ใช้ NetworkPathManager เพื่อได้รับโฟลเดอร์หลักที่ถูกต้อง
+            Dim baseFolderPath As String = NetworkPathManager.GetFilmCharacterCheckPath()
+
+            ' ตรวจสอบว่าได้รับพาธหรือไม่
+            If String.IsNullOrEmpty(baseFolderPath) Then
+                result.ErrorDirectories.Add("ไม่สามารถเชื่อมต่อกับเครือข่าย OA หรือ FAB ได้")
+                Return result
+            End If
 
             ' ตรวจสอบว่าโฟลเดอร์หลักมีอยู่จริงหรือไม่
             If Not Directory.Exists(baseFolderPath) Then
@@ -1995,7 +1986,7 @@ Public Class frmHistory
                             Dim fileDetail As New FileDetail() With {
                             .FileName = Path.GetFileName(filePath),
                             .FullPath = filePath,
-                            .RelativePath = GetRelativePath("\\10.24.179.2\OAFAB\OA2FAB\20250607 Pimploy S", filePath),
+                            .RelativePath = GetRelativePath(NetworkPathManager.GetCustomPath("20250607 Pimploy S"), filePath),
                             .FileSize = fileInfo.Length,
                             .LastModified = fileInfo.LastWriteTime
                         }
@@ -3086,7 +3077,11 @@ Public Class frmHistory
 
                                                      If MessageBox.Show(message, "ไม่มีข้อมูลไฟล์", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
                                                          Try
-                                                             Dim networkFolder As String = "\\10.24.179.2\OAFAB\OA2FAB\Film charecter check"
+                                                             Dim networkFolder As String = NetworkPathManager.GetFilmCharacterCheckPath()
+                                                             If String.IsNullOrEmpty(networkFolder) Then
+                                                                 MessageBox.Show("ไม่สามารถเชื่อมต่อกับเครือข่าย OA หรือ FAB ได้", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                                                                 Return
+                                                             End If
                                                              Process.Start("explorer.exe", networkFolder)
                                                          Catch ex As Exception
                                                              MessageBox.Show($"ไม่สามารถเปิดโฟลเดอร์เครือข่ายได้: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
@@ -3862,12 +3857,7 @@ Public Class frmHistory
 #End Region
 
 #Region "Support Classes"
-    ' คลาสสำหรับผลลัพธ์การตรวจสอบเครือข่าย
-    Public Class NetworkCheckResult
-        Public Property IsConnected As Boolean = False
-        Public Property NetworkType As String = ""
-        Public Property ErrorMessage As String = ""
-    End Class
+    ' หมายเหตุ: ใช้ NetworkPathManager.NetworkCheckResult แทน
 #End Region
 
     ''' <summary>

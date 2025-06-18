@@ -3,15 +3,42 @@ Imports System.Diagnostics
 Imports System.Windows.Forms
 
 Public Class UpdateManager
-    Private Shared ReadOnly UPDATE_SERVER_PATH As String = "\\fls951\OAFAB\OA2FAB\Film charecter check\DebugSystems\net8.0-windows\"
     Private Shared ReadOnly CURRENT_EXE_PATH As String = Application.ExecutablePath
     Private Shared ReadOnly CURRENT_APP_FOLDER As String = Path.GetDirectoryName(Application.ExecutablePath)
-    Private Shared ReadOnly VERSION_FILE As String = Path.Combine(UPDATE_SERVER_PATH, "version.txt")
+    
+    ''' <summary>
+    ''' ได้รับพาธของเซิร์ฟเวอร์อัพเดทตาม network ปัจจุบัน
+    ''' </summary>
+    Private Shared ReadOnly Property UPDATE_SERVER_PATH As String
+        Get
+            Dim networkPath = NetworkPathManager.GetUpdateSystemPath()
+            If Not String.IsNullOrEmpty(networkPath) Then
+                Return networkPath
+            End If
+            
+            ' ถ้าไม่พบ network ให้ใช้พาธเดิมเพื่อแสดงข้อผิดพลาด
+            Return "\\fls951\OAFAB\OA2FAB\Film charecter check\DebugSystems\net8.0-windows\"
+        End Get
+    End Property
+    
+    Private Shared ReadOnly Property VERSION_FILE As String
+        Get
+            Return Path.Combine(UPDATE_SERVER_PATH, "version.txt")
+        End Get
+    End Property
     
     Public Shared Function CheckForUpdates() As UpdateCheckResult
         Try
+            ' ตรวจสอบการเชื่อมต่อ network ก่อน
+            Dim networkResult = NetworkPathManager.CheckNetworkConnection()
+            If Not networkResult.IsConnected Then
+                Return New UpdateCheckResult() With {.HasUpdate = False, .ErrorMessage = $"ไม่สามารถเชื่อมต่อกับเครือข่าย: {networkResult.ErrorMessage}"}
+            End If
+            
+            Console.WriteLine($"Update check - Connected to {networkResult.NetworkType} network ({networkResult.ServerIP})")
+            
             If Not Directory.Exists(UPDATE_SERVER_PATH) Then
-                Return New UpdateCheckResult() With {.HasUpdate = False, .ErrorMessage = "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์อัปเดตได้"}
+                Return New UpdateCheckResult() With {.HasUpdate = False, .ErrorMessage = $"ไม่พบโฟลเดอร์อัปเดต: {UPDATE_SERVER_PATH}"}
             End If
             
             Dim currentVersion = GetCurrentVersion()
