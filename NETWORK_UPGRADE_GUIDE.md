@@ -32,9 +32,11 @@ Dim accessPath = NetworkPathManager.GetAccessDatabasePath()
 Dim updatePath = NetworkPathManager.GetUpdateSystemPath()
 ```
 
-### 2. การตรวจสอบ Network อัตโนมัติ
-- ระบบจะ ping `10.24.179.2` ก่อน (Network OA)
-- หากไม่ได้ผล จะ ping `172.24.0.3` (Network FAB)
+### 2. การตรวจสอบ Network อัตโนมัติ (Logic ใหม่)
+- ระบบจะ ping ทั้ง `10.24.179.2` และ `172.24.0.3` พร้อมกัน
+- **ถ้าปิง `172.24.0.3` ไม่ได้** = เครือข่าย **OA**
+- **ถ้าปิงได้ทั้งสอง** = เครือข่าย **FAB**
+- **ถ้าปิงได้แค่ `172.24.0.3`** = เครือข่าย **FAB**
 - ใช้ timeout 3 วินาที
 
 ### 3. การจัดการพาธแบบไดนามิก

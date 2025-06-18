@@ -16,8 +16,8 @@ Public Class UpdateManager
                 Return networkPath
             End If
             
-            ' ถ้าไม่พบ network ให้ใช้พาธเดิมเพื่อแสดงข้อผิดพลาด
-            Return "\\fls951\OAFAB\OA2FAB\Film charecter check\DebugSystems\net8.0-windows\"
+            ' ถ้าไม่พบ network ให้ส่งคืนข้อความแสดงข้อผิดพลาด
+            Return "ERROR: ไม่สามารถเชื่อมต่อกับเครือข่าย OA หรือ FAB ได้"
         End Get
     End Property
     
@@ -266,6 +266,14 @@ del ""%~f0""
             Dim localVersionFile = GetLocalVersionPath()
             Dim assemblyVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version
             
+            ' แสดงข้อมูล debug
+            Console.WriteLine($"🔍 InitializeVersionFile Debug Info:")
+            Console.WriteLine($"   Application.ExecutablePath: {Application.ExecutablePath}")
+            Console.WriteLine($"   CURRENT_APP_FOLDER: {CURRENT_APP_FOLDER}")
+            Console.WriteLine($"   Local version file path: {localVersionFile}")
+            Console.WriteLine($"   Assembly version: {assemblyVersion}")
+            Console.WriteLine($"   Directory exists: {Directory.Exists(CURRENT_APP_FOLDER)}")
+            
             Dim shouldUpdateVersionFile As Boolean = False
             Dim reason As String = ""
             
@@ -275,28 +283,53 @@ del ""%~f0""
                 reason = "ไม่พบไฟล์ version.txt"
             Else
                 Try
-                    Dim fileVersion = New Version(File.ReadAllText(localVersionFile).Trim())
+                    Dim fileContent = File.ReadAllText(localVersionFile).Trim()
+                    Console.WriteLine($"   Current file content: '{fileContent}'")
+                    Dim fileVersion = New Version(fileContent)
                     If fileVersion <> assemblyVersion Then
                         shouldUpdateVersionFile = True
                         reason = $"เวอร์ชันไม่ตรงกัน (Assembly: {assemblyVersion}, File: {fileVersion})"
                     End If
-                Catch
+                Catch ex As Exception
                     shouldUpdateVersionFile = True
-                    reason = "ไฟล์ version.txt เสียหาย"
+                    reason = $"ไฟล์ version.txt เสียหาย: {ex.Message}"
                 End Try
             End If
             
             ' อัปเดตไฟล์ version.txt ถ้าจำเป็น
             If shouldUpdateVersionFile Then
-                File.WriteAllText(localVersionFile, assemblyVersion.ToString())
-                Console.WriteLine($"✅ อัปเดต version.txt: {reason}")
-                Console.WriteLine($"   เวอร์ชันใหม่: {assemblyVersion}")
+                Try
+                    ' ตรวจสอบสิทธิ์การเขียนไฟล์
+                    Dim directoryPath = Path.GetDirectoryName(localVersionFile)
+                    If Not Directory.Exists(directoryPath) Then
+                        Directory.CreateDirectory(directoryPath)
+                        Console.WriteLine($"   สร้างโฟลเดอร์: {directoryPath}")
+                    End If
+                    
+                    ' เขียนไฟล์
+                    File.WriteAllText(localVersionFile, assemblyVersion.ToString())
+                    Console.WriteLine($"✅ อัปเดต version.txt สำเร็จ: {reason}")
+                    Console.WriteLine($"   เวอร์ชันใหม่: {assemblyVersion}")
+                    Console.WriteLine($"   ไฟล์ตำแหน่ง: {localVersionFile}")
+                    
+                    ' ตรวจสอบว่าไฟล์ถูกเขียนจริงหรือไม่
+                    If File.Exists(localVersionFile) Then
+                        Dim writtenContent = File.ReadAllText(localVersionFile).Trim()
+                        Console.WriteLine($"   เนื้อหาที่เขียน: '{writtenContent}'")
+                    End If
+                    
+                Catch writeEx As Exception
+                    Console.WriteLine($"❌ ไม่สามารถเขียนไฟล์ version.txt ได้: {writeEx.Message}")
+                    Console.WriteLine($"   Path: {localVersionFile}")
+                    Console.WriteLine($"   Directory writable: {IsDirectoryWritable(Path.GetDirectoryName(localVersionFile))}")
+                End Try
             Else
                 Console.WriteLine($"✅ version.txt ถูกต้องแล้ว: {assemblyVersion}")
             End If
             
         Catch ex As Exception
             Console.WriteLine($"❌ Error initializing version file: {ex.Message}")
+            Console.WriteLine($"   Stack trace: {ex.StackTrace}")
         End Try
     End Sub
     
@@ -316,6 +349,24 @@ del ""%~f0""
             Console.WriteLine($"❌ Error syncing version file: {ex.Message}")
         End Try
     End Sub
+    
+    ''' <summary>
+    ''' ตรวจสอบว่าสามารถเขียนไฟล์ในโฟลเดอร์ได้หรือไม่
+    ''' </summary>
+    Private Shared Function IsDirectoryWritable(directoryPath As String) As Boolean
+        Try
+            If Not Directory.Exists(directoryPath) Then
+                Return False
+            End If
+            
+            Dim testFile = Path.Combine(directoryPath, "write_test.tmp")
+            File.WriteAllText(testFile, "test")
+            File.Delete(testFile)
+            Return True
+        Catch
+            Return False
+        End Try
+    End Function
     
     ''' <summary>
     ''' ตรวจสอบความสอดคล้องระหว่าง Assembly version และไฟล์ version.txt

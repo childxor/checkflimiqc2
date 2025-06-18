@@ -29,6 +29,7 @@ Public Class NetworkPathManager
     
     ''' <summary>
     ''' ตรวจสอบการเชื่อมต่อ network และกำหนดประเภท network
+    ''' Logic ใหม่: ถ้าปิง 172.24.0.3 ไม่ได้ = OA, ถ้าปิงได้ทั้งสอง = FAB
     ''' </summary>
     ''' <returns>ผลลัพธ์การตรวจสอบ network</returns>
     Public Shared Function CheckNetworkConnection() As NetworkCheckResult
@@ -36,46 +37,77 @@ Public Class NetworkPathManager
         
         Try
             Dim ping As New Ping()
+            Dim canPingOA As Boolean = False
+            Dim canPingFAB As Boolean = False
             
-            ' ทดสอบเครือข่าย OA ก่อน
+            ' ทดสอบการเชื่อมต่อ OA (10.24.179.2)
             Try
                 Dim replyOa As PingReply = ping.Send(OA_SERVER_IP, PING_TIMEOUT)
-                If replyOa.Status = IPStatus.Success Then
+                canPingOA = (replyOa.Status = IPStatus.Success)
+                If canPingOA Then
+                    Console.WriteLine($"OA network ({OA_SERVER_IP}) is reachable")
+                End If
+            Catch ex As Exception
+                Console.WriteLine($"OA network test failed: {ex.Message}")
+                canPingOA = False
+            End Try
+            
+            ' ทดสอบการเชื่อมต่อ FAB (172.24.0.3)
+            Try
+                Dim replyFab As PingReply = ping.Send(FAB_SERVER_IP, PING_TIMEOUT)
+                canPingFAB = (replyFab.Status = IPStatus.Success)
+                If canPingFAB Then
+                    Console.WriteLine($"FAB network ({FAB_SERVER_IP}) is reachable")
+                End If
+            Catch ex As Exception
+                Console.WriteLine($"FAB network test failed: {ex.Message}")
+                canPingFAB = False
+            End Try
+            
+            ' กำหนดประเภทเครือข่ายตาม logic ใหม่
+            If Not canPingFAB Then
+                ' ถ้าปิง FAB (172.24.0.3) ไม่ได้ = เครือข่าย OA
+                If canPingOA Then
                     result.IsConnected = True
                     result.NetworkType = "OA"
                     result.ServerIP = OA_SERVER_IP
                     result.BasePath = $"\\{OA_SERVER_IP}\{BASE_SHARE_PATH}"
-                    Console.WriteLine($"Connected to OA network ({OA_SERVER_IP})")
+                    Console.WriteLine($"Network determined as OA (FAB unreachable)")
+                    Return result
+                Else
+                    result.IsConnected = False
+                    result.ErrorMessage = "ไม่สามารถเชื่อมต่อกับเครือข่าย OA ได้"
+                    Console.WriteLine("Both networks unreachable, but assuming OA environment")
                     Return result
                 End If
-            Catch ex As Exception
-                Console.WriteLine($"OA network test failed: {ex.Message}")
-            End Try
-            
-            ' ทดสอบเครือข่าย FAB
-            Try
-                Dim replyFab As PingReply = ping.Send(FAB_SERVER_IP, PING_TIMEOUT)
-                If replyFab.Status = IPStatus.Success Then
-                    result.IsConnected = True
-                    result.NetworkType = "FAB"
-                    result.ServerIP = FAB_SERVER_IP
-                    result.BasePath = $"\\{FAB_SERVER_IP}\{BASE_SHARE_PATH}"
-                    Console.WriteLine($"Connected to FAB network ({FAB_SERVER_IP})")
-                    Return result
-                End If
-            Catch ex As Exception
-                Console.WriteLine($"FAB network test failed: {ex.Message}")
-                result.ErrorMessage = $"ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้: {ex.Message}"
-            End Try
-            
-            result.IsConnected = False
-            If String.IsNullOrEmpty(result.ErrorMessage) Then
+            ElseIf canPingOA And canPingFAB Then
+                ' ถ้าปิงได้ทั้งสอง = เครือข่าย FAB
+                result.IsConnected = True
+                result.NetworkType = "FAB"
+                result.ServerIP = FAB_SERVER_IP
+                result.BasePath = $"\\{FAB_SERVER_IP}\{BASE_SHARE_PATH}"
+                Console.WriteLine($"Network determined as FAB (both networks reachable)")
+                Return result
+            ElseIf canPingFAB And Not canPingOA Then
+                ' ถ้าปิงได้แค่ FAB = เครือข่าย FAB
+                result.IsConnected = True
+                result.NetworkType = "FAB"
+                result.ServerIP = FAB_SERVER_IP
+                result.BasePath = $"\\{FAB_SERVER_IP}\{BASE_SHARE_PATH}"
+                Console.WriteLine($"Network determined as FAB (only FAB reachable)")
+                Return result
+            Else
+                ' ไม่สามารถเชื่อมต่อได้เลย
+                result.IsConnected = False
                 result.ErrorMessage = "ไม่สามารถเชื่อมต่อกับเครือข่าย OA หรือ FAB ได้"
+                Console.WriteLine("No network connection available")
+                Return result
             End If
             
         Catch ex As Exception
             result.IsConnected = False
             result.ErrorMessage = $"เกิดข้อผิดพลาดในการตรวจสอบเครือข่าย: {ex.Message}"
+            Console.WriteLine($"Network check error: {ex.Message}")
         End Try
         
         Return result

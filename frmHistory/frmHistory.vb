@@ -26,8 +26,8 @@ Public Class frmHistory
                 Return networkPath
             End If
             
-            ' ถ้าไม่พบ network ให้ใช้พาธเดิมเพื่อแสดงข้อผิดพลาด
-            Return "\\fls951\OAFAB\OA2FAB\Film charecter check\Database.xlsx"
+            ' ถ้าไม่พบ network ให้ส่งคืนข้อความแสดงข้อผิดพลาด
+            Return "ERROR: ไม่สามารถเชื่อมต่อกับเครือข่าย OA หรือ FAB ได้"
         End Get
     End Property
 #End Region
@@ -345,7 +345,7 @@ Public Class frmHistory
         Try
             ' ตรวจสอบว่าข้อมูลโหลดแล้วหรือยัง
             If dataCache.IsLoaded AndAlso
-               dataCache.ExcelFilePath.Equals(excelFilePath, StringComparison.OrdinalIgnoreCase) Then
+               dataCache.ExcelFilePath.Equals(ExcelFilePath, StringComparison.OrdinalIgnoreCase) Then
                 Console.WriteLine("ข้อมูล Excel โหลดแล้ว ไม่ต้องโหลดใหม่")
                 Return True
             End If
@@ -374,7 +374,7 @@ Public Class frmHistory
             ' โหลดข้อมูลใน Background Thread
             Dim result = Await Task.Run(Function() As LoadResult
                                             Try
-                                                Return dataCache.LoadExcelDataWithProgress(excelFilePath, progressHandler)
+                                                Return dataCache.LoadExcelDataWithProgress(ExcelFilePath, progressHandler)
                                             Catch ex As Exception
                                                 Console.WriteLine($"Error in background loading: {ex.Message}")
                                                 Return New LoadResult() With {
@@ -429,7 +429,7 @@ Public Class frmHistory
                     End Try
                 End Sub)
 
-            Dim result = dataCache.LoadExcelDataWithProgress(excelFilePath, progressHandler)
+            Dim result = dataCache.LoadExcelDataWithProgress(ExcelFilePath, progressHandler)
 
             ' อัพเดท UI ใน Main Thread
             Me.Invoke(Sub()
@@ -1986,7 +1986,7 @@ Public Class frmHistory
                             Dim fileDetail As New FileDetail() With {
                             .FileName = Path.GetFileName(filePath),
                             .FullPath = filePath,
-                            .RelativePath = GetRelativePath(NetworkPathManager.GetCustomPath("20250607 Pimploy S"), filePath),
+                            .RelativePath = GetRelativePath(NetworkPathManager.GetFilmCharacterCheckPath(), filePath),
                             .FileSize = fileInfo.Length,
                             .LastModified = fileInfo.LastWriteTime
                         }

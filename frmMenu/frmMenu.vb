@@ -59,16 +59,23 @@ Public Class frmMenu
         InitializeDatabase()
 
         ' ตรวจสอบและซิงค์ไฟล์ version.txt กับ Assembly version อัตโนมัติ
+        Console.WriteLine("🔄 เริ่มต้นการซิงค์ไฟล์ version.txt...")
         UpdateManager.InitializeVersionFile()
 
         ' แสดงข้อมูลเวอร์ชันใน Console (สำหรับ debug)
         Dim versionCheck = UpdateManager.CheckVersionConsistency()
-        Console.WriteLine($"Version Check: {versionCheck}")
+        Console.WriteLine($"📋 Version Check Result: {versionCheck}")
+        
+        ' แสดงข้อมูลเวอร์ชันใน Status Bar
+        Try
+            Dim assemblyVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version
+            UpdateStatusBar($"พร้อมรับการสแกน QR Code - Version {assemblyVersion}")
+        Catch ex As Exception
+            UpdateStatusBar("พร้อมรับการสแกน QR Code")
+        End Try
 
         ' เช็คการอัปเดตในพื้นหลัง
         CheckForUpdatesAsync()
-
-        UpdateStatusBar("พร้อมรับการสแกน QR Code")
         UpdateFormTitleWithVersion()
     End Sub
 
@@ -113,26 +120,38 @@ Public Class frmMenu
     End Sub
 
     Private Sub btnCheckUpdate_Click(sender As Object, e As EventArgs) Handles btnCheckUpdate.Click
-    Try
-        UpdateStatusBar("กำลังตรวจสอบอัพเดท...")
-        
-        Dim result = UpdateManager.CheckForUpdates()
-        
-        If result.HasUpdate Then
-            ShowUpdateDialog(result)
-        ElseIf String.IsNullOrEmpty(result.ErrorMessage) Then
-            MessageBox.Show("คุณใช้เวอร์ชันล่าสุดอยู่แล้ว", "ตรวจสอบอัพเดท", MessageBoxButtons.OK, MessageBoxIcon.Information)
-        Else
-            MessageBox.Show($"ไม่สามารถตรวจสอบอัพเดทได้: {result.ErrorMessage}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-        End If
-        
-        UpdateStatusBar("พร้อมรับการสแกน QR Code")
-        
-    Catch ex As Exception
-        MessageBox.Show($"เกิดข้อผิดพลาด: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        UpdateStatusBar("พร้อมรับการสแกน QR Code")
-    End Try
-End Sub
+        Try
+            UpdateStatusBar("กำลังตรวจสอบอัพเดท...")
+            
+            ' Force sync version file ก่อนเช็คอัปเดต
+            Console.WriteLine("🔄 Force sync version file ก่อนเช็คอัปเดต...")
+            UpdateManager.SyncVersionWithAssembly()
+            
+            Dim result = UpdateManager.CheckForUpdates()
+            
+            If result.HasUpdate Then
+                ShowUpdateDialog(result)
+            ElseIf String.IsNullOrEmpty(result.ErrorMessage) Then
+                ' แสดงข้อมูลเวอร์ชันปัจจุบัน
+                Dim assemblyVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version
+                MessageBox.Show($"คุณใช้เวอร์ชันล่าสุดอยู่แล้ว{vbNewLine}{vbNewLine}เวอร์ชันปัจจุบัน: {assemblyVersion}", 
+                               "ตรวจสอบอัพเดท", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            Else
+                MessageBox.Show($"ไม่สามารถตรวจสอบอัพเดทได้: {result.ErrorMessage}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End If
+            
+            Try
+                Dim assemblyVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version
+                UpdateStatusBar($"พร้อมรับการสแกน QR Code - Version {assemblyVersion}")
+            Catch
+                UpdateStatusBar("พร้อมรับการสแกน QR Code")
+            End Try
+            
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาด: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            UpdateStatusBar("พร้อมรับการสแกน QR Code")
+        End Try
+    End Sub
 
     ' Private Sub InitializeUI()
     '     Try
