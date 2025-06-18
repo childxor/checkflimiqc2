@@ -786,6 +786,8 @@ Public Class frmHistory
             ' ซ่อน progress bar เริ่มต้น
             toolStripProgressBar.Visible = False
 
+            AddHandler btnCreateAllMissions.Click, AddressOf btnCreateAllMissions_Click
+
             Console.WriteLine("InitializeForm completed")
 
         Catch ex As Exception
@@ -794,7 +796,7 @@ Public Class frmHistory
         End Try
     End Sub
 
-    Private Sub btnCreateAllMissions_Click(sender As Object, e As EventArgs) Handles btnCreateAllMissions.Click
+    Private Sub btnCreateAllMissions_Click(sender As Object, e As EventArgs)
         CreateAllMissions()
     End Sub
 
@@ -4029,7 +4031,7 @@ Public Class frmHistory
                        If(failCount = 0, MessageBoxIcon.Information, MessageBoxIcon.Warning))
 
         Catch ex As Exception
-        toolStripProgressBar.Visible = False
+            toolStripProgressBar.Visible = False
         MessageBox.Show($"เกิดข้อผิดพลาดในการสร้าง Mission: {ex.Message}",
                        "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
     End Try

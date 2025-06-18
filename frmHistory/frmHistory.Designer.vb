@@ -50,6 +50,8 @@ Partial Class frmHistory
         Me.saveFileDialog = New System.Windows.Forms.SaveFileDialog()
         Me.openFileDialog = New System.Windows.Forms.OpenFileDialog()
         Me.btnSettings = New System.Windows.Forms.Button()
+        Me.btnCreateAllMissions = New System.Windows.Forms.Button()
+
 
         Me.pnlHeader.SuspendLayout()
         CType(Me.picIcon, System.ComponentModel.ISupportInitialize).BeginInit()
@@ -84,6 +86,7 @@ Partial Class frmHistory
         Me.lblTitle.Size = New System.Drawing.Size(298, 30)
         Me.lblTitle.TabIndex = 1
         Me.lblTitle.Text = "ประวัติการสแกน QR Code"
+        
 
         '
         'picIcon
@@ -280,7 +283,8 @@ btnCreateAllMissions.TabIndex = 6
         Me.pnlButtons.Controls.Add(Me.btnDelete)
         Me.pnlButtons.Controls.Add(Me.btnExport)
         Me.pnlButtons.Controls.Add(Me.btnExportExcel)
-        Me.pnlButtons.Controls.Add(Me.btnSettings)
+        Me.pnlButtons.Controls.Add(Me.btnSettings) 
+        Me.pnlButtons.Controls.Add(Me.btnCreateAllMissions)
         Me.pnlButtons.Controls.Add(Me.btnClose)
         Me.pnlButtons.Dock = System.Windows.Forms.DockStyle.Bottom
         Me.pnlButtons.Location = New System.Drawing.Point(0, 560)
@@ -365,6 +369,21 @@ btnCreateAllMissions.TabIndex = 6
         Me.btnSettings.TabIndex = 4
         Me.btnSettings.Text = "ตั้งค่าฐานข้อมูล"
         Me.btnSettings.UseVisualStyleBackColor = False
+
+        '
+'btnCreateAllMissions
+'
+Me.btnCreateAllMissions.BackColor = System.Drawing.Color.FromArgb(CByte(155), CByte(89), CByte(182))
+Me.btnCreateAllMissions.FlatAppearance.BorderSize = 0
+Me.btnCreateAllMissions.FlatStyle = System.Windows.Forms.FlatStyle.Flat
+Me.btnCreateAllMissions.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
+Me.btnCreateAllMissions.ForeColor = System.Drawing.Color.White
+Me.btnCreateAllMissions.Location = New System.Drawing.Point(760, 15)
+Me.btnCreateAllMissions.Name = "btnCreateAllMissions"
+Me.btnCreateAllMissions.Size = New System.Drawing.Size(150, 35)
+Me.btnCreateAllMissions.TabIndex = 7
+Me.btnCreateAllMissions.Text = "🚀 สร้าง Mission ทั้งหมด"
+Me.btnCreateAllMissions.UseVisualStyleBackColor = False
 
         '
         'btnClose
