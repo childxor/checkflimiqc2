@@ -108,6 +108,18 @@ Partial Class frmHistory
         Me.pnlFilter.Size = New System.Drawing.Size(1200, 100)
         Me.pnlFilter.TabIndex = 1
 
+        Dim btnCreateAllMissions As New System.Windows.Forms.Button()
+btnCreateAllMissions.Name = "btnCreateAllMissions"
+btnCreateAllMissions.Text = "🚀 สร้าง Mission ทั้งหมด"
+btnCreateAllMissions.BackColor = System.Drawing.Color.FromArgb(CByte(155), CByte(89), CByte(182))
+btnCreateAllMissions.ForeColor = System.Drawing.Color.White
+btnCreateAllMissions.FlatStyle = System.Windows.Forms.FlatStyle.Flat
+btnCreateAllMissions.FlatAppearance.BorderSize = 0
+btnCreateAllMissions.Font = New System.Drawing.Font("Segoe UI", 9.0!, System.Drawing.FontStyle.Bold)
+btnCreateAllMissions.Location = New System.Drawing.Point(600, 15) ' ปรับตำแหน่งตามต้องการ
+btnCreateAllMissions.Size = New System.Drawing.Size(150, 35)
+btnCreateAllMissions.TabIndex = 6
+
         '
         'grpFilter
         '
@@ -474,5 +486,6 @@ Partial Class frmHistory
     Friend WithEvents saveFileDialog As SaveFileDialog
     Friend WithEvents openFileDialog As OpenFileDialog
     Friend WithEvents btnSettings As Button
+    Friend WithEvents btnCreateAllMissions As Button
 
 End Class

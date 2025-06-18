@@ -774,6 +774,7 @@ Public Class frmHistory
                 grpFilter.Controls.Add(cmbMissionStatus)
             End If
 
+
             ' ตั้งค่าวันที่เริ่มต้น
             dtpFromDate.Value = DateTime.Now.AddDays(-7)
             dtpToDate.Value = DateTime.Now
@@ -791,6 +792,10 @@ Public Class frmHistory
             Console.WriteLine($"Error in InitializeForm: {ex.Message}")
             Throw
         End Try
+    End Sub
+
+    Private Sub btnCreateAllMissions_Click(sender As Object, e As EventArgs) Handles btnCreateAllMissions.Click
+        CreateAllMissions()
     End Sub
 
     Private Sub SetupDataGridView()
@@ -1080,65 +1085,65 @@ Public Class frmHistory
 
 #Region "Data Filtering and Display"
     Private Sub ApplyFilters()
-    Try
-        If scanHistory Is Nothing Then Return
+        Try
+            If scanHistory Is Nothing Then Return
 
-        ' ดึงค่าการกรอง
-        Dim searchText As String = txtSearch.Text.Trim().ToLower()
-        Dim statusFilter As String = cmbStatus.SelectedItem.ToString()
+            ' ดึงค่าการกรอง
+            Dim searchText As String = txtSearch.Text.Trim().ToLower()
+            Dim statusFilter As String = cmbStatus.SelectedItem.ToString()
 
-        ' ดึงค่าการกรองสถานะ Mission
-        Dim missionStatusFilter As String = "ทั้งหมด"
-        Dim cmbMissionStatus As ComboBox = TryCast(grpFilter.Controls("cmbMissionStatus"), ComboBox)
+            ' ดึงค่าการกรองสถานะ Mission
+            Dim missionStatusFilter As String = "ทั้งหมด"
+            Dim cmbMissionStatus As ComboBox = TryCast(grpFilter.Controls("cmbMissionStatus"), ComboBox)
 
-        If cmbMissionStatus IsNot Nothing AndAlso cmbMissionStatus.SelectedItem IsNot Nothing Then
-            missionStatusFilter = cmbMissionStatus.SelectedItem.ToString()
-        End If
+            If cmbMissionStatus IsNot Nothing AndAlso cmbMissionStatus.SelectedItem IsNot Nothing Then
+                missionStatusFilter = cmbMissionStatus.SelectedItem.ToString()
+            End If
 
-        Dim fromDate As DateTime = dtpFromDate.Value.Date
-        Dim toDate As DateTime = dtpToDate.Value.Date.AddDays(1).AddSeconds(-1) ' ถึงสิ้นวัน
+            Dim fromDate As DateTime = dtpFromDate.Value.Date
+            Dim toDate As DateTime = dtpToDate.Value.Date.AddDays(1).AddSeconds(-1) ' ถึงสิ้นวัน
 
-        ' กรองข้อมูล
-        filteredHistory = scanHistory.Where(Function(record)
-                                                ' กรองตามวันที่
-                                                Dim isInDateRange As Boolean = record.ScanDateTime >= fromDate AndAlso record.ScanDateTime <= toDate
+            ' กรองข้อมูล
+            filteredHistory = scanHistory.Where(Function(record)
+                                                    ' กรองตามวันที่
+                                                    Dim isInDateRange As Boolean = record.ScanDateTime >= fromDate AndAlso record.ScanDateTime <= toDate
 
-                                                ' กรองตามสถานะความถูกต้อง
-                                                Dim matchesStatus As Boolean = statusFilter = "ทั้งหมด" OrElse
+                                                    ' กรองตามสถานะความถูกต้อง
+                                                    Dim matchesStatus As Boolean = statusFilter = "ทั้งหมด" OrElse
                                           (statusFilter = "ถูกต้อง" AndAlso record.IsValid) OrElse
                                           (statusFilter = "ไม่ถูกต้อง" AndAlso Not record.IsValid)
 
-                                                ' กรองตามสถานะ Mission - แก้ไขส่วนนี้
-                                                Dim matchesMissionStatus As Boolean
-                                                If missionStatusFilter = "ทั้งหมด" Then
-                                                    ' เมื่อเลือก "ทั้งหมด" ให้แสดงเฉพาะ "รอดำเนินการ" และ "ไม่มี"
-                                                    matchesMissionStatus = record.MissionStatus = "รอดำเนินการ" OrElse 
+                                                    ' กรองตามสถานะ Mission - แก้ไขส่วนนี้
+                                                    Dim matchesMissionStatus As Boolean
+                                                    If missionStatusFilter = "ทั้งหมด" Then
+                                                        ' เมื่อเลือก "ทั้งหมด" ให้แสดงเฉพาะ "รอดำเนินการ" และ "ไม่มี"
+                                                        matchesMissionStatus = record.MissionStatus = "รอดำเนินการ" OrElse
                                                                          record.MissionStatus = "ไม่มี" OrElse
                                                                          String.IsNullOrEmpty(record.MissionStatus)
-                                                Else
-                                                    ' เมื่อเลือกสถานะเฉพาะ ให้แสดงตามที่เลือก
-                                                    matchesMissionStatus = record.MissionStatus = missionStatusFilter
-                                                End If
+                                                    Else
+                                                        ' เมื่อเลือกสถานะเฉพาะ ให้แสดงตามที่เลือก
+                                                        matchesMissionStatus = record.MissionStatus = missionStatusFilter
+                                                    End If
 
-                                                ' กรองตามข้อความค้นหา
-                                                Dim matchesSearch As Boolean = String.IsNullOrEmpty(searchText) OrElse
+                                                    ' กรองตามข้อความค้นหา
+                                                    Dim matchesSearch As Boolean = String.IsNullOrEmpty(searchText) OrElse
                                          record.ProductCode.ToLower().Contains(searchText) OrElse
                                          record.ReferenceCode.ToLower().Contains(searchText) OrElse
                                          record.DateCode.ToLower().Contains(searchText)
 
-                                                ' ต้องตรงกับทุกเงื่อนไข
-                                                Return isInDateRange AndAlso matchesStatus AndAlso matchesMissionStatus AndAlso matchesSearch
-                                            End Function).ToList()
+                                                    ' ต้องตรงกับทุกเงื่อนไข
+                                                    Return isInDateRange AndAlso matchesStatus AndAlso matchesMissionStatus AndAlso matchesSearch
+                                                End Function).ToList()
 
-        ' แสดงผลข้อมูลที่กรอง
-        DisplayData()
+            ' แสดงผลข้อมูลที่กรอง
+            DisplayData()
 
-    Catch ex As Exception
-        Console.WriteLine($"Error in ApplyFilters: {ex.Message}")
-        MessageBox.Show($"เกิดข้อผิดพลาดในการกรองข้อมูล: {ex.Message}",
+        Catch ex As Exception
+            Console.WriteLine($"Error in ApplyFilters: {ex.Message}")
+            MessageBox.Show($"เกิดข้อผิดพลาดในการกรองข้อมูล: {ex.Message}",
                       "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-    End Try
-End Sub
+        End Try
+    End Sub
 
     Private Sub DisplayData()
         Try
@@ -2799,6 +2804,55 @@ End Sub
         End Try
     End Function
 
+    ''' <summary>
+    ''' ตรวจสอบความถูกต้องของไฟล์ก่อนยืนยันความสำเร็จ
+    ''' </summary>
+    Private Function VerifyMissionCompletion(record As ScanDataRecord, scannedWorkpieceCode As String) As Boolean
+        Try
+            ' อ่านข้อมูล Mission ที่บันทึกไว้
+            Dim missionData As Dictionary(Of String, String) = ReadMissionData(record)
+            If missionData Is Nothing Then
+                MessageBox.Show("ไม่พบข้อมูล Mission", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return False
+            End If
+
+            ' ดึงชื่อไฟล์จาก Mission data
+            Dim missionFilePath As String = ""
+            If missionData.ContainsKey("ไฟล์เกี่ยวข้อง") Then
+                missionFilePath = missionData("ไฟล์เกี่ยวข้อง")
+            ElseIf Not String.IsNullOrEmpty(record.RelatedFilePath) Then
+                missionFilePath = record.RelatedFilePath
+            End If
+
+            If String.IsNullOrEmpty(missionFilePath) Then
+                MessageBox.Show("ไม่พบข้อมูลไฟล์ที่เกี่ยวข้อง", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return False
+            End If
+
+            ' แยกชื่อไฟล์จาก path (เช่น "SN1B63P101XG-01E_US_VA.pdf" จาก path เต็ม)
+            Dim missionFileName As String = Path.GetFileNameWithoutExtension(missionFilePath)
+
+            ' เอาส่วนที่เป็น product code ออกมา (ตัดส่วน "_US_VA" ออก)
+            Dim missionProductCode As String = missionFileName.Split("_"c)(0)
+
+            ' เปรียบเทียบกับข้อมูลที่สแกนจากชิ้นงาน
+            If scannedWorkpieceCode.Equals(missionProductCode, StringComparison.OrdinalIgnoreCase) Then
+                Return True
+            Else
+                MessageBox.Show($"ไฟล์ไม่ตรงกัน!{vbCrLf}{vbCrLf}" &
+                          $"ไฟล์ใน Mission: {missionProductCode}{vbCrLf}" &
+                          $"ข้อมูลที่สแกน: {scannedWorkpieceCode}",
+                          "การตรวจสอบไม่ผ่าน", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                Return False
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการตรวจสอบ: {ex.Message}",
+                       "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Return False
+        End Try
+    End Function
+
     Private Function CheckMissionStatus(record As ScanDataRecord, rowIndex As Integer) As String
         Try
             If record Is Nothing Then
@@ -3158,19 +3212,29 @@ End Sub
 
             ' Event Handlers
             AddHandler btnMarkComplete.Click, Sub()
-                                                  If MessageBox.Show("ยืนยันการทำเครื่องหมายว่า Mission นี้สำเร็จแล้ว?",
-                                                               "ยืนยัน", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
-                                                      record.MissionStatus = "สำเร็จ"
-                                                      If UpdateMissionStatus(record) Then
-                                                          ' อัปเดตการแสดงผลในตาราง
-                                                          dgvHistory.Rows(rowIndex).Cells("MissionStatus").Value = "สำเร็จ"
-                                                          dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Value = "✅ สำเร็จ"
-                                                          dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Style.ForeColor = Color.Green
+                                                  ' เพิ่มการสแกนรหัสชิ้นงานเพื่อยืนยันก่อน
+                                                  Dim scannedCode As String = InputBox("กรุณาสแกนรหัสชิ้นงานเพื่อยืนยัน:", "ตรวจสอบชิ้นงาน")
 
-                                                          MessageBox.Show("อัปเดตสถานะ Mission เป็น 'สำเร็จ' แล้ว",
-                                                                     "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                                                          statusForm.Close()
+                                                  If Not String.IsNullOrEmpty(scannedCode) Then
+                                                      ' เรียกฟังก์ชันตรวจสอบไฟล์
+                                                      If VerifyMissionCompletion(record, scannedCode) Then
+                                                          If MessageBox.Show("ยืนยันการทำเครื่องหมายว่า Mission นี้สำเร็จแล้ว?",
+                              "ยืนยัน", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
+                                                              record.MissionStatus = "สำเร็จ"
+                                                              If UpdateMissionStatus(record) Then
+                                                                  ' อัปเดตการแสดงผลในตาราง
+                                                                  dgvHistory.Rows(rowIndex).Cells("MissionStatus").Value = "สำเร็จ"
+                                                                  dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Value = "✅ สำเร็จ"
+                                                                  dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Style.ForeColor = Color.Green
+
+                                                                  MessageBox.Show("อัปเดตสถานะ Mission เป็น 'สำเร็จ' แล้ว",
+                                   "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                                                                  statusForm.Close()
+                                                              End If
+                                                          End If
                                                       End If
+                                                  Else
+                                                      MessageBox.Show("ต้องสแกนรหัสชิ้นงานก่อนยืนยัน", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning)
                                                   End If
                                               End Sub
 
@@ -3859,6 +3923,168 @@ End Sub
                       End Sub)
         End Try
     End Sub
+
+    ''' <summary>
+    ''' สร้าง Mission ทั้งหมดที่ยังไม่มี
+    ''' </summary>
+    Private Async Sub CreateAllMissions()
+        Try
+            ' ค้นหารายการที่ยังไม่มี Mission
+            Dim recordsWithoutMission As New List(Of ScanDataRecord)()
+
+            For Each record As ScanDataRecord In filteredHistory
+                If String.IsNullOrEmpty(record.MissionStatus) OrElse record.MissionStatus = "ไม่มี" Then
+                    recordsWithoutMission.Add(record)
+                End If
+            Next
+
+            If recordsWithoutMission.Count = 0 Then
+                MessageBox.Show("ไม่มีรายการที่ต้องสร้าง Mission",
+                           "แจ้งเตือน", MessageBoxButtons.OK, MessageBoxIcon.Information)
+                Return
+            End If
+
+            ' ยืนยันการสร้าง
+            Dim confirmResult = MessageBox.Show(
+            $"พบรายการที่ยังไม่มี Mission จำนวน {recordsWithoutMission.Count} รายการ{vbCrLf}{vbCrLf}" &
+            "ต้องการสร้าง Mission สำหรับรายการทั้งหมดหรือไม่?",
+            "ยืนยันการสร้าง Mission",
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question)
+
+            If confirmResult <> DialogResult.Yes Then
+                Return
+            End If
+
+            ' แสดง Progress Bar
+            toolStripProgressBar.Visible = True
+            toolStripProgressBar.Style = ProgressBarStyle.Continuous
+            toolStripProgressBar.Maximum = recordsWithoutMission.Count
+            toolStripProgressBar.Value = 0
+
+            Dim successCount As Integer = 0
+            Dim failCount As Integer = 0
+            Dim failedItems As New List(Of String)()
+
+            For i As Integer = 0 To recordsWithoutMission.Count - 1
+                Dim record = recordsWithoutMission(i)
+
+                ' อัปเดต Status Bar
+                lblCount.Text = $"กำลังสร้าง Mission... {i + 1}/{recordsWithoutMission.Count} - {record.ProductCode}"
+                Application.DoEvents()
+
+                Try
+                    ' ตรวจสอบว่าสามารถสร้าง Mission ได้หรือไม่
+                    Dim canCreateResult As MissionCreationCheck = Await CheckMissionCreationRequirementsAsync(record.ProductCode)
+
+                    If canCreateResult.CanCreate Then
+                        ' สร้าง Mission แบบอัตโนมัติ
+                        If CreateAutoMission(record, canCreateResult) Then
+                            record.MissionStatus = "รอดำเนินการ"
+                            UpdateMissionStatus(record)
+                            successCount += 1
+                        Else
+                            failCount += 1
+                            failedItems.Add($"{record.ProductCode} - ไม่สามารถสร้าง Mission ได้")
+                        End If
+                    Else
+                        failCount += 1
+                        failedItems.Add($"{record.ProductCode} - {canCreateResult.Reason}")
+                    End If
+
+                Catch ex As Exception
+                    failCount += 1
+                    failedItems.Add($"{record.ProductCode} - ข้อผิดพลาด: {ex.Message}")
+                End Try
+
+                ' อัปเดต Progress Bar
+                toolStripProgressBar.Value = i + 1
+            Next
+
+            ' ซ่อน Progress Bar
+            toolStripProgressBar.Visible = False
+            lblCount.Text = $"จำนวนรายการ: {filteredHistory.Count} จาก {scanHistory.Count} รายการ"
+
+            ' รีเฟรชข้อมูล - แก้ไขตรงนี้
+            LoadScanHistory()
+
+            ' แสดงผลลัพธ์
+            Dim resultMessage As String = $"สร้าง Mission เสร็จสิ้น!{vbCrLf}{vbCrLf}" &
+                                    $"✅ สำเร็จ: {successCount} รายการ{vbCrLf}" &
+                                    $"❌ ไม่สำเร็จ: {failCount} รายการ"
+
+            If failCount > 0 Then
+                resultMessage += $"{vbCrLf}{vbCrLf}รายการที่ไม่สำเร็จ:{vbCrLf}"
+                For Each failedItem In failedItems.Take(10) ' แสดงเฉพาะ 10 รายการแรก
+                    resultMessage += $"• {failedItem}{vbCrLf}"
+                Next
+
+                If failedItems.Count > 10 Then
+                    resultMessage += $"• และอีก {failedItems.Count - 10} รายการ..."
+                End If
+            End If
+
+            MessageBox.Show(resultMessage, "ผลการสร้าง Mission",
+                       MessageBoxButtons.OK,
+                       If(failCount = 0, MessageBoxIcon.Information, MessageBoxIcon.Warning))
+
+        Catch ex As Exception
+        toolStripProgressBar.Visible = False
+        MessageBox.Show($"เกิดข้อผิดพลาดในการสร้าง Mission: {ex.Message}",
+                       "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+    End Try
+End Sub
+
+''' <summary>
+''' สร้าง Mission แบบอัตโนมัติ (ไม่ต้องกรอกข้อมูล)
+''' </summary>
+Private Function CreateAutoMission(record As ScanDataRecord, creationCheck As MissionCreationCheck) As Boolean
+    Try
+        ' สร้าง Mission ID ใหม่
+        Dim missionId As String = $"MISSION_{DateTime.Now:yyyyMMddHHmmss}_{record.Id}"
+        
+        ' ข้อมูล Mission แบบอัตโนมัติ
+        Dim missionName As String = $"Mission_{record.ProductCode}"
+        Dim assignedTo As String = "Auto Generated"
+        Dim dueDate As DateTime = DateTime.Now.AddDays(7) ' กำหนดส่ง 7 วัน
+        Dim description As String = $"Mission ที่สร้างอัตโนมัติสำหรับ {record.ProductCode}"
+        
+        ' บันทึก RelatedFilePath ลงฐานข้อมูล
+        If creationCheck.FoundFile IsNot Nothing AndAlso Not String.IsNullOrEmpty(creationCheck.FoundFile.FullPath) Then
+            Dim relatedFilePath As String = creationCheck.FoundFile.FullPath
+            Dim updateSuccess As Boolean = AccessDatabaseManager.UpdateRelatedFilePath(record.Id, relatedFilePath)
+            If updateSuccess Then
+                record.RelatedFilePath = relatedFilePath
+            End If
+        End If
+        
+        ' บันทึกข้อมูล Mission
+        Dim missionData As String = $"ID: {missionId}{vbCrLf}" &
+                                   $"ชื่อ: {missionName}{vbCrLf}" &
+                                   $"รายละเอียด: {description}{vbCrLf}" &
+                                   $"ผู้รับผิดชอบ: {assignedTo}{vbCrLf}" &
+                                   $"กำหนดส่ง: {dueDate:yyyy-MM-dd HH:mm:ss}{vbCrLf}" &
+                                   $"วันที่สร้าง: {DateTime.Now:yyyy-MM-dd HH:mm:ss}{vbCrLf}" &
+                                   $"รหัสผลิตภัณฑ์: {record.ProductCode}{vbCrLf}" &
+                                   $"ข้อมูล Excel: {creationCheck.ExcelMatch.Column4Value}{vbCrLf}" &
+                                   $"ไฟล์เกี่ยวข้อง: {If(creationCheck.FoundFile IsNot Nothing, creationCheck.FoundFile.FullPath, "")}"
+        
+        ' บันทึกลงไฟล์
+        Dim missionDir As String = Path.Combine(Application.StartupPath, "Missions")
+        If Not Directory.Exists(missionDir) Then
+            Directory.CreateDirectory(missionDir)
+        End If
+        
+        Dim missionFile As String = Path.Combine(missionDir, $"{missionId}.txt")
+        File.WriteAllText(missionFile, missionData, Encoding.UTF8)
+        
+        Return True
+        
+    Catch ex As Exception
+        Console.WriteLine($"Error in CreateAutoMission: {ex.Message}")
+        Return False
+    End Try
+End Function
 
 #End Region
 
