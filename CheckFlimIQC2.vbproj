@@ -6,7 +6,7 @@
     <StartupObject>Sub Main</StartupObject>
     <UseWindowsForms>true</UseWindowsForms>
     <MyType>WindowsForms</MyType>
-    <AssemblyVersion>1.0.5.0</AssemblyVersion>
+    <AssemblyVersion>1.0.6.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
     <AssemblyTitle>QR Code Scanner System</AssemblyTitle>
     <AssemblyDescription>ระบบสแกน QR Code สำหรับตรวจสอบและบันทึกข้อมูลผลิตภัณฑ์</AssemblyDescription>

@@ -1080,56 +1080,65 @@ Public Class frmHistory
 
 #Region "Data Filtering and Display"
     Private Sub ApplyFilters()
-        Try
-            If scanHistory Is Nothing Then Return
+    Try
+        If scanHistory Is Nothing Then Return
 
-            ' ดึงค่าการกรอง
-            Dim searchText As String = txtSearch.Text.Trim().ToLower()
-            Dim statusFilter As String = cmbStatus.SelectedItem.ToString()
+        ' ดึงค่าการกรอง
+        Dim searchText As String = txtSearch.Text.Trim().ToLower()
+        Dim statusFilter As String = cmbStatus.SelectedItem.ToString()
 
-            ' ดึงค่าการกรองสถานะ Mission
-            Dim missionStatusFilter As String = "ทั้งหมด"
-            Dim cmbMissionStatus As ComboBox = TryCast(grpFilter.Controls("cmbMissionStatus"), ComboBox)
-            If cmbMissionStatus IsNot Nothing AndAlso cmbMissionStatus.SelectedItem IsNot Nothing Then
-                missionStatusFilter = cmbMissionStatus.SelectedItem.ToString()
-            End If
+        ' ดึงค่าการกรองสถานะ Mission
+        Dim missionStatusFilter As String = "ทั้งหมด"
+        Dim cmbMissionStatus As ComboBox = TryCast(grpFilter.Controls("cmbMissionStatus"), ComboBox)
 
-            Dim fromDate As DateTime = dtpFromDate.Value.Date
-            Dim toDate As DateTime = dtpToDate.Value.Date.AddDays(1).AddSeconds(-1) ' ถึงสิ้นวัน
+        If cmbMissionStatus IsNot Nothing AndAlso cmbMissionStatus.SelectedItem IsNot Nothing Then
+            missionStatusFilter = cmbMissionStatus.SelectedItem.ToString()
+        End If
 
-            ' กรองข้อมูล
-            filteredHistory = scanHistory.Where(Function(record)
-                                                    ' กรองตามวันที่
-                                                    Dim isInDateRange As Boolean = record.ScanDateTime >= fromDate AndAlso record.ScanDateTime <= toDate
+        Dim fromDate As DateTime = dtpFromDate.Value.Date
+        Dim toDate As DateTime = dtpToDate.Value.Date.AddDays(1).AddSeconds(-1) ' ถึงสิ้นวัน
 
-                                                    ' กรองตามสถานะความถูกต้อง
-                                                    Dim matchesStatus As Boolean = statusFilter = "ทั้งหมด" OrElse
-                                              (statusFilter = "ถูกต้อง" AndAlso record.IsValid) OrElse
-                                              (statusFilter = "ไม่ถูกต้อง" AndAlso Not record.IsValid)
+        ' กรองข้อมูล
+        filteredHistory = scanHistory.Where(Function(record)
+                                                ' กรองตามวันที่
+                                                Dim isInDateRange As Boolean = record.ScanDateTime >= fromDate AndAlso record.ScanDateTime <= toDate
 
-                                                    ' กรองตามสถานะ Mission
-                                                    Dim matchesMissionStatus As Boolean = missionStatusFilter = "ทั้งหมด" OrElse
-                                                     record.MissionStatus = missionStatusFilter
+                                                ' กรองตามสถานะความถูกต้อง
+                                                Dim matchesStatus As Boolean = statusFilter = "ทั้งหมด" OrElse
+                                          (statusFilter = "ถูกต้อง" AndAlso record.IsValid) OrElse
+                                          (statusFilter = "ไม่ถูกต้อง" AndAlso Not record.IsValid)
 
-                                                    ' กรองตามข้อความค้นหา
-                                                    Dim matchesSearch As Boolean = String.IsNullOrEmpty(searchText) OrElse
-                                             record.ProductCode.ToLower().Contains(searchText) OrElse
-                                             record.ReferenceCode.ToLower().Contains(searchText) OrElse
-                                             record.DateCode.ToLower().Contains(searchText)
+                                                ' กรองตามสถานะ Mission - แก้ไขส่วนนี้
+                                                Dim matchesMissionStatus As Boolean
+                                                If missionStatusFilter = "ทั้งหมด" Then
+                                                    ' เมื่อเลือก "ทั้งหมด" ให้แสดงเฉพาะ "รอดำเนินการ" และ "ไม่มี"
+                                                    matchesMissionStatus = record.MissionStatus = "รอดำเนินการ" OrElse 
+                                                                         record.MissionStatus = "ไม่มี" OrElse
+                                                                         String.IsNullOrEmpty(record.MissionStatus)
+                                                Else
+                                                    ' เมื่อเลือกสถานะเฉพาะ ให้แสดงตามที่เลือก
+                                                    matchesMissionStatus = record.MissionStatus = missionStatusFilter
+                                                End If
 
-                                                    ' ต้องตรงกับทุกเงื่อนไข
-                                                    Return isInDateRange AndAlso matchesStatus AndAlso matchesMissionStatus AndAlso matchesSearch
-                                                End Function).ToList()
+                                                ' กรองตามข้อความค้นหา
+                                                Dim matchesSearch As Boolean = String.IsNullOrEmpty(searchText) OrElse
+                                         record.ProductCode.ToLower().Contains(searchText) OrElse
+                                         record.ReferenceCode.ToLower().Contains(searchText) OrElse
+                                         record.DateCode.ToLower().Contains(searchText)
 
-            ' แสดงผลข้อมูลที่กรอง
-            DisplayData()
+                                                ' ต้องตรงกับทุกเงื่อนไข
+                                                Return isInDateRange AndAlso matchesStatus AndAlso matchesMissionStatus AndAlso matchesSearch
+                                            End Function).ToList()
 
-        Catch ex As Exception
-            Console.WriteLine($"Error in ApplyFilters: {ex.Message}")
-            MessageBox.Show($"เกิดข้อผิดพลาดในการกรองข้อมูล: {ex.Message}",
-                          "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        End Try
-    End Sub
+        ' แสดงผลข้อมูลที่กรอง
+        DisplayData()
+
+    Catch ex As Exception
+        Console.WriteLine($"Error in ApplyFilters: {ex.Message}")
+        MessageBox.Show($"เกิดข้อผิดพลาดในการกรองข้อมูล: {ex.Message}",
+                      "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+    End Try
+End Sub
 
     Private Sub DisplayData()
         Try
@@ -2924,7 +2933,7 @@ Public Class frmHistory
                 If dataCache.IsLoaded Then
                     Dim searchResult = dataCache.SearchInMemory(record.ProductCode)
                     If searchResult.IsSuccess AndAlso searchResult.HasMatches Then
-                        Dim excelMatch = searchResult.FirstMatch
+                        excelMatch = searchResult.FirstMatch
                         excelInfo = $"ข้อมูลจาก Excel: {excelMatch.Column4Value}"
                     End If
                 End If
@@ -3201,87 +3210,6 @@ Public Class frmHistory
             Return ""
         End Try
     End Function
-
-    ''' <summary>
-    ''' อ่านข้อมูลจาก Mission file
-    ''' </summary>
-    ''' <param name="record">ข้อมูลการสแกน</param>
-    ''' <returns>Dictionary ของข้อมูล Mission หรือ Nothing ถ้าไม่พบ</returns>
-    Private Function ReadMissionData(record As ScanDataRecord) As Dictionary(Of String, String)
-        Try
-            ' ค้นหาไฟล์ Mission
-            Dim missionFiles = FindMissionFiles(record)
-            If missionFiles.Count = 0 Then
-                Console.WriteLine($"ไม่พบไฟล์ Mission สำหรับ record ID: {record.Id}")
-                Return Nothing
-            End If
-
-            ' อ่านไฟล์ Mission แรกที่เจอ
-            Dim missionFile = missionFiles(0)
-            Console.WriteLine($"อ่านไฟล์ Mission: {missionFile.FullName}")
-
-            Dim content As String = File.ReadAllText(missionFile.FullName, Encoding.UTF8)
-            Dim data As New Dictionary(Of String, String)()
-
-            ' แยกข้อมูลจากไฟล์ (รูปแบบ "key: value")
-            Dim lines() As String = content.Split({vbCrLf, vbLf}, StringSplitOptions.RemoveEmptyEntries)
-
-            For Each line In lines
-                If line.Contains(":") Then
-                    Dim parts() As String = line.Split({":", "="}, 2, StringSplitOptions.None)
-                    If parts.Length = 2 Then
-                        Dim key As String = parts(0).Trim()
-                        Dim value As String = parts(1).Trim()
-                        data(key) = value
-                        Console.WriteLine($"Mission data: {key} = {value}")
-                    End If
-                End If
-            Next
-
-            Return data
-
-        Catch ex As Exception
-            Console.WriteLine($"Error reading Mission data: {ex.Message}")
-            Return Nothing
-        End Try
-    End Function
-
-    ''' <summary>
-    ''' ค้นหาไฟล์ Mission ที่เกี่ยวข้องกับ record
-    ''' </summary>
-    ''' <param name="record">ข้อมูลการสแกน</param>
-    ''' <returns>รายการไฟล์ Mission</returns>
-    Private Function FindMissionFiles(record As ScanDataRecord) As List(Of FileInfo)
-        Dim files As New List(Of FileInfo)()
-
-        Try
-            ' ค้นหาไฟล์ Mission
-            Dim missionDir As String = Path.Combine(Application.StartupPath, "Missions")
-            If Directory.Exists(missionDir) Then
-                Dim missionPattern As String = $"MISSION_*_{record.Id}.txt"
-                Dim missionFiles = Directory.GetFiles(missionDir, missionPattern)
-
-                For Each file In missionFiles
-                    files.Add(New FileInfo(file))
-                Next
-
-                ' ถ้าไม่เจอแบบ specific ให้ลองค้นหาแบบ general
-                If files.Count = 0 Then
-                    Dim generalPattern As String = $"*{record.ProductCode}*"
-                    Dim generalFiles = Directory.GetFiles(missionDir, generalPattern)
-                    For Each file In generalFiles
-                        files.Add(New FileInfo(file))
-                    Next
-                End If
-            End If
-
-        Catch ex As Exception
-            Console.WriteLine($"Error in FindMissionFiles: {ex.Message}")
-        End Try
-
-        Return files
-    End Function
-
 
     Private Function UpdateMissionStatus(record As ScanDataRecord) As Boolean
         Try

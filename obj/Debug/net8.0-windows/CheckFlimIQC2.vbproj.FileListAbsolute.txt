@@ -191,3 +191,14 @@ D:\iqc_project\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFlimIQC2.AssemblyInfo
 D:\iqc_project\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFlimIQC2.AssemblyInfo.vb
 D:\iqc_project\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFlimIQC2.vbproj.CoreCompileInputs.cache
 D:\iqc_project\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFlimIQC2.sourcelink.json
+X:\net8.0-windows\CheckFlimIQC2.exe
+X:\net8.0-windows\CheckFlimIQC2.deps.json
+X:\net8.0-windows\CheckFlimIQC2.runtimeconfig.json
+X:\net8.0-windows\CheckFlimIQC2.dll
+X:\net8.0-windows\CheckFlimIQC2.pdb
+D:\iqc_project\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFli.F148C275.Up2Date
+D:\iqc_project\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFlimIQC2.dll
+D:\iqc_project\CheckFlimIQC2\obj\Debug\net8.0-windows\refint\CheckFlimIQC2.dll
+D:\iqc_project\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFlimIQC2.pdb
+D:\iqc_project\CheckFlimIQC2\obj\Debug\net8.0-windows\CheckFlimIQC2.genruntimeconfig.cache
+D:\iqc_project\CheckFlimIQC2\obj\Debug\net8.0-windows\ref\CheckFlimIQC2.dll
