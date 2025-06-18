@@ -2806,82 +2806,82 @@ End Function
     End Function
 
     Private Function CheckMissionStatus(record As ScanDataRecord, rowIndex As Integer) As String
-    Try
-        If record Is Nothing Then
-            MessageBox.Show("ไม่พบข้อมูลการสแกน", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-            Return ""
-        End If
+        Try
+            If record Is Nothing Then
+                MessageBox.Show("ไม่พบข้อมูลการสแกน", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                Return ""
+            End If
 
-        ' สร้างฟอร์มแสดงสถานะ Mission ที่ปรับปรุงแล้ว
-        Dim statusForm As New Form()
-        statusForm.Text = "ตรวจสอบสถานะ Mission"
-        statusForm.Size = New Size(900, 750)  ' เพิ่มขนาด
-        statusForm.StartPosition = FormStartPosition.CenterParent
-        statusForm.FormBorderStyle = FormBorderStyle.FixedDialog
-        statusForm.MaximizeBox = False
-        statusForm.MinimizeBox = False
-        statusForm.BackColor = Color.WhiteSmoke
-        statusForm.Font = New Font("Segoe UI", 9)
-        statusForm.Padding = New Padding(15)
+            ' สร้างฟอร์มแสดงสถานะ Mission ที่ปรับปรุงแล้ว
+            Dim statusForm As New Form()
+            statusForm.Text = "ตรวจสอบสถานะ Mission"
+            statusForm.Size = New Size(900, 750)  ' เพิ่มขนาด
+            statusForm.StartPosition = FormStartPosition.CenterParent
+            statusForm.FormBorderStyle = FormBorderStyle.FixedDialog
+            statusForm.MaximizeBox = False
+            statusForm.MinimizeBox = False
+            statusForm.BackColor = Color.WhiteSmoke
+            statusForm.Font = New Font("Segoe UI", 9)
+            statusForm.Padding = New Padding(15)
 
-        ' ตัวแปรสำหรับจัดการ layout แบบ responsive
-        Dim formWidth As Integer = statusForm.ClientSize.Width - 30
-        Dim panelMargin As Integer = 10
-        Dim currentY As Integer = panelMargin
+            ' ตัวแปรสำหรับจัดการ layout แบบ responsive
+            Dim formWidth As Integer = statusForm.ClientSize.Width - 30
+            Dim panelMargin As Integer = 10
+            Dim currentY As Integer = panelMargin
 
-        ' Header Panel
-        Dim headerPanel As New Panel()
-        headerPanel.Size = New Size(formWidth, 80)
-        headerPanel.Location = New Point(15, currentY)
-        headerPanel.BackColor = Color.FromArgb(155, 89, 182)
-        headerPanel.BorderStyle = BorderStyle.None
-        headerPanel.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+            ' Header Panel
+            Dim headerPanel As New Panel()
+            headerPanel.Size = New Size(formWidth, 80)
+            headerPanel.Location = New Point(15, currentY)
+            headerPanel.BackColor = Color.FromArgb(155, 89, 182)
+            headerPanel.BorderStyle = BorderStyle.None
+            headerPanel.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
 
-        Dim lblTitle As New Label()
-        lblTitle.Text = "📋 ตรวจสอบสถานะ Mission"
-        lblTitle.Font = New Font("Segoe UI", 16, FontStyle.Bold)
-        lblTitle.Location = New Point(20, 15)
-        lblTitle.AutoSize = True
-        lblTitle.ForeColor = Color.White
-        lblTitle.BackColor = Color.Transparent
+            Dim lblTitle As New Label()
+            lblTitle.Text = "📋 ตรวจสอบสถานะ Mission"
+            lblTitle.Font = New Font("Segoe UI", 16, FontStyle.Bold)
+            lblTitle.Location = New Point(20, 15)
+            lblTitle.AutoSize = True
+            lblTitle.ForeColor = Color.White
+            lblTitle.BackColor = Color.Transparent
 
-        Dim lblStatus As New Label()
-        lblStatus.Text = $"สถานะปัจจุบัน: {record.MissionStatus}"
-        lblStatus.Font = New Font("Segoe UI", 12, FontStyle.Bold)
-        lblStatus.Location = New Point(20, 50)
-        lblStatus.AutoSize = True
-        lblStatus.ForeColor = Color.White
-        lblStatus.BackColor = Color.Transparent
+            Dim lblStatus As New Label()
+            lblStatus.Text = $"สถานะปัจจุบัน: {record.MissionStatus}"
+            lblStatus.Font = New Font("Segoe UI", 12, FontStyle.Bold)
+            lblStatus.Location = New Point(20, 50)
+            lblStatus.AutoSize = True
+            lblStatus.ForeColor = Color.White
+            lblStatus.BackColor = Color.Transparent
 
-        headerPanel.Controls.AddRange({lblTitle, lblStatus})
-        currentY += headerPanel.Height + panelMargin
+            headerPanel.Controls.AddRange({lblTitle, lblStatus})
+            currentY += headerPanel.Height + panelMargin
 
-        ' Info Panel - ใช้ TableLayoutPanel
-        Dim infoPanel As New Panel()
-        infoPanel.Size = New Size(formWidth, 200)
-        infoPanel.Location = New Point(15, currentY)
-        infoPanel.BackColor = Color.White
-        infoPanel.BorderStyle = BorderStyle.FixedSingle
-        infoPanel.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+            ' Info Panel - ใช้ TableLayoutPanel
+            Dim infoPanel As New Panel()
+            infoPanel.Size = New Size(formWidth, 200)
+            infoPanel.Location = New Point(15, currentY)
+            infoPanel.BackColor = Color.White
+            infoPanel.BorderStyle = BorderStyle.FixedSingle
+            infoPanel.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
 
-        Dim infoTable As New TableLayoutPanel()
-        infoTable.Size = New Size(formWidth - 20, 180)
-        infoTable.Location = New Point(10, 10)
-        infoTable.ColumnCount = 2
-        infoTable.RowCount = 8
-        infoTable.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+            Dim infoTable As New TableLayoutPanel()
+            infoTable.Size = New Size(formWidth - 20, 180)
+            infoTable.Location = New Point(10, 10)
+            infoTable.ColumnCount = 2
+            infoTable.RowCount = 8
+            infoTable.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
 
-        ' กำหนดขนาดคอลัมน์
-        infoTable.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
-        infoTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
+            ' กำหนดขนาดคอลัมน์
+            infoTable.ColumnStyles.Add(New ColumnStyle(SizeType.AutoSize))
+            infoTable.ColumnStyles.Add(New ColumnStyle(SizeType.Percent, 100))
 
-        ' กำหนดขนาดแถว
-        For i As Integer = 0 To 7
-            infoTable.RowStyles.Add(New RowStyle(SizeType.Absolute, 22))
-        Next
+            ' กำหนดขนาดแถว
+            For i As Integer = 0 To 7
+                infoTable.RowStyles.Add(New RowStyle(SizeType.Absolute, 22))
+            Next
 
-        ' สร้าง Labels สำหรับข้อมูล
-        Dim infoLabels() As (icon As String, text As String, value As String) = {
+            ' สร้าง Labels สำหรับข้อมูล
+            Dim infoLabels() As (icon As String, text As String, value As String) = {
             ("🔍", "รหัสผลิตภัณฑ์:", record.ProductCode),
             ("📅", "วันที่สแกน:", record.ScanDateTime.ToString("yyyy-MM-dd HH:mm:ss")),
             ("📋", "รหัสอ้างอิง:", record.ReferenceCode),
@@ -2892,359 +2892,415 @@ End Function
             ("✅", "สถานะข้อมูล:", If(record.IsValid, "ถูกต้อง", "ไม่ถูกต้อง"))
         }
 
-        For i As Integer = 0 To infoLabels.Length - 1
-            Dim lblKey As New Label()
-            lblKey.Text = $"{infoLabels(i).icon} {infoLabels(i).text}"
-            lblKey.Font = New Font("Segoe UI", 10, FontStyle.Bold)
-            lblKey.ForeColor = Color.FromArgb(52, 73, 94)
-            lblKey.TextAlign = ContentAlignment.MiddleLeft
-            lblKey.Dock = DockStyle.Fill
+            For i As Integer = 0 To infoLabels.Length - 1
+                Dim lblKey As New Label()
+                lblKey.Text = $"{infoLabels(i).icon} {infoLabels(i).text}"
+                lblKey.Font = New Font("Segoe UI", 10, FontStyle.Bold)
+                lblKey.ForeColor = Color.FromArgb(52, 73, 94)
+                lblKey.TextAlign = ContentAlignment.MiddleLeft
+                lblKey.Dock = DockStyle.Fill
 
-            Dim lblValue As New Label()
-            lblValue.Text = infoLabels(i).value
-            lblValue.Font = New Font("Segoe UI", 10)
-            lblValue.ForeColor = Color.FromArgb(44, 62, 80)
-            lblValue.TextAlign = ContentAlignment.MiddleLeft
-            lblValue.Dock = DockStyle.Fill
+                Dim lblValue As New Label()
+                lblValue.Text = infoLabels(i).value
+                lblValue.Font = New Font("Segoe UI", 10)
+                lblValue.ForeColor = Color.FromArgb(44, 62, 80)
+                lblValue.TextAlign = ContentAlignment.MiddleLeft
+                lblValue.Dock = DockStyle.Fill
 
-            infoTable.Controls.Add(lblKey, 0, i)
-            infoTable.Controls.Add(lblValue, 1, i)
-        Next
+                infoTable.Controls.Add(lblKey, 0, i)
+                infoTable.Controls.Add(lblValue, 1, i)
+            Next
 
-        infoPanel.Controls.Add(infoTable)
-        currentY += infoPanel.Height + panelMargin
+            infoPanel.Controls.Add(infoTable)
+            currentY += infoPanel.Height + panelMargin
 
-        ' Excel & File Panel - ปรับปรุงให้ดูไฟล์ได้เหมือน Mission Form
-        Dim filePanel As New Panel()
-        filePanel.Size = New Size(formWidth, 160)
-        filePanel.Location = New Point(15, currentY)
-        filePanel.BackColor = Color.FromArgb(248, 249, 250)
-        filePanel.BorderStyle = BorderStyle.FixedSingle
-        filePanel.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+            ' Excel & File Panel - ปรับปรุงให้ดูไฟล์ได้เหมือน Mission Form
+            Dim filePanel As New Panel()
+            filePanel.Size = New Size(formWidth, 160)
+            filePanel.Location = New Point(15, currentY)
+            filePanel.BackColor = Color.FromArgb(248, 249, 250)
+            filePanel.BorderStyle = BorderStyle.FixedSingle
+            filePanel.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
 
-        Dim lblFileTitle As New Label()
-        lblFileTitle.Text = "📁 ข้อมูล Excel และไฟล์ที่เกี่ยวข้อง"
-        lblFileTitle.Font = New Font("Segoe UI", 12, FontStyle.Bold)
-        lblFileTitle.Location = New Point(15, 15)
-        lblFileTitle.AutoSize = True
-        lblFileTitle.ForeColor = Color.FromArgb(52, 73, 94)
+            Dim lblFileTitle As New Label()
+            lblFileTitle.Text = "📁 ข้อมูล Excel และไฟล์ที่เกี่ยวข้อง"
+            lblFileTitle.Font = New Font("Segoe UI", 12, FontStyle.Bold)
+            lblFileTitle.Location = New Point(15, 15)
+            lblFileTitle.AutoSize = True
+            lblFileTitle.ForeColor = Color.FromArgb(52, 73, 94)
 
-        ' ค้นหาข้อมูล Excel และไฟล์ที่เกี่ยวข้อง
-        Dim excelMatch As ExcelUtility.ExcelMatch = Nothing
-        Dim relatedFile As FileInfo = Nothing
-        Dim excelInfo As String = "ไม่พบข้อมูลใน Excel"
+            ' ค้นหาข้อมูล Excel และไฟล์ที่เกี่ยวข้องจาก Mission log
+            Dim excelMatch As ExcelUtility.ExcelMatchResult = Nothing
+            Dim relatedFilePath As String = Nothing
+            Dim excelInfo As String = "ไม่พบข้อมูลใน Excel"
 
-        Try
-            If dataCache.IsLoaded Then
-                Dim searchResult = dataCache.SearchInMemory(record.ProductCode)
-                If searchResult.IsSuccess AndAlso searchResult.HasMatches Then
-                    excelMatch = searchResult.FirstMatch
-                    excelInfo = $"ข้อมูลจาก Excel: {excelMatch.Column4Value}"
+            ' อ่านข้อมูลจาก Mission file ที่บันทึกไว้
+            Dim missionData As Dictionary(Of String, String) = ReadMissionData(record)
 
-                    ' ค้นหาไฟล์ที่เกี่ยวข้อง
-                    If Not String.IsNullOrEmpty(excelMatch.Column4Value) Then
-                        Dim searchPattern As String = $"*{excelMatch.Column4Value}*"
-                        relatedFile = FindRelatedFile(searchPattern)
-                    End If
+            If missionData IsNot Nothing Then
+                ' ใช้ข้อมูลจาก Mission file ที่บันทึกไว้แล้ว
+                If missionData.ContainsKey("ข้อมูล Excel") Then
+                    excelInfo = $"ข้อมูลจาก Excel: {missionData("ข้อมูล Excel")}"
                 End If
+
+                ' ดึง path ไฟล์จาก Mission log
+                If missionData.ContainsKey("ไฟล์เกี่ยวข้อง") Then
+                    relatedFilePath = missionData("ไฟล์เกี่ยวข้อง")
+                    Console.WriteLine($"พบไฟล์จาก Mission log: {relatedFilePath}")
+                End If
+            Else
+                ' ถ้าไม่มี Mission file ให้ลองค้นหาจาก dataCache
+                Try
+                    If dataCache.IsLoaded Then
+                        Dim searchResult = dataCache.SearchInMemory(record.ProductCode)
+                        If searchResult.IsSuccess AndAlso searchResult.HasMatches Then
+                            excelMatch = searchResult.FirstMatch
+                            excelInfo = $"ข้อมูลจาก Excel: {excelMatch.Column4Value}"
+                            Console.WriteLine($"ไม่มี Mission file, ค้นหาจาก dataCache: {excelMatch.Column4Value}")
+                        End If
+                    End If
+                Catch ex As Exception
+                    excelInfo = $"ข้อผิดพลาดในการค้นหา: {ex.Message}"
+                    Console.WriteLine($"Error searching Excel data: {ex.Message}")
+                End Try
             End If
-        Catch ex As Exception
-            excelInfo = $"ข้อผิดพลาดในการค้นหา: {ex.Message}"
-        End Try
 
-        ' แสดงข้อมูล Excel
-        Dim lblExcelInfo As New Label()
-        lblExcelInfo.Text = $"📊 {excelInfo}"
-        lblExcelInfo.Location = New Point(15, 50)
-        lblExcelInfo.Size = New Size(formWidth - 140, 25)
-        lblExcelInfo.Font = New Font("Segoe UI", 10)
-        lblExcelInfo.ForeColor = Color.FromArgb(39, 174, 96)
+            ' แสดงข้อมูล Excel
+            Dim lblExcelInfo As New Label()
+            lblExcelInfo.Text = $"📊 {excelInfo}"
+            lblExcelInfo.Location = New Point(15, 50)
+            lblExcelInfo.Size = New Size(formWidth - 140, 25)
+            lblExcelInfo.Font = New Font("Segoe UI", 10)
+            lblExcelInfo.ForeColor = Color.FromArgb(39, 174, 96)
 
-        ' แสดงข้อมูลไฟล์
-        Dim fileInfo As String = If(relatedFile IsNot Nothing, 
-                                   $"ไฟล์ที่เกี่ยวข้อง: {relatedFile.Name}", 
+            ' แสดงข้อมูลไฟล์
+            Dim fileInfo As String = If(Not String.IsNullOrEmpty(relatedFilePath),
+                                   $"ไฟล์ที่เกี่ยวข้อง: {Path.GetFileName(relatedFilePath)}",
                                    "ไม่พบไฟล์ที่เกี่ยวข้อง")
 
-        Dim lblFileInfo As New Label()
-        lblFileInfo.Text = $"📄 {fileInfo}"
-        lblFileInfo.Location = New Point(15, 80)
-        lblFileInfo.Size = New Size(formWidth - 140, 25)
-        lblFileInfo.Font = New Font("Segoe UI", 10)
-        lblFileInfo.ForeColor = Color.FromArgb(41, 128, 185)
+            Dim lblFileInfo As New Label()
+            lblFileInfo.Text = $"📄 {fileInfo}"
+            lblFileInfo.Location = New Point(15, 80)
+            lblFileInfo.Size = New Size(formWidth - 140, 25)
+            lblFileInfo.Font = New Font("Segoe UI", 10)
+            lblFileInfo.ForeColor = Color.FromArgb(41, 128, 185)
 
-        ' ปุ่มดูไฟล์ (เหมือนใน Mission Form)
-        Dim btnPreviewFile As New Button()
-        btnPreviewFile.Text = "👁️ ดูไฟล์"
-        btnPreviewFile.Location = New Point(formWidth - 110, 77)
-        btnPreviewFile.Size = New Size(100, 30)
-        btnPreviewFile.BackColor = Color.FromArgb(52, 152, 219)
-        btnPreviewFile.ForeColor = Color.White
-        btnPreviewFile.FlatStyle = FlatStyle.Flat
-        btnPreviewFile.FlatAppearance.BorderSize = 0
-        btnPreviewFile.Font = New Font("Segoe UI", 9, FontStyle.Bold)
-        btnPreviewFile.Enabled = relatedFile IsNot Nothing
-        AddHandler btnPreviewFile.Click, Sub()
-                                             If relatedFile IsNot Nothing Then
-                                                 OpenFileWithErrorHandling(relatedFile.FullName)
-                                             End If
-                                         End Sub
+            ' ปุ่มดูไฟล์ (เหมือนใน Mission Form)
+            Dim btnPreviewFile As New Button()
+            btnPreviewFile.Text = "👁️ ดูไฟล์"
+            btnPreviewFile.Location = New Point(formWidth - 110, 77)
+            btnPreviewFile.Size = New Size(100, 30)
+            btnPreviewFile.BackColor = Color.FromArgb(52, 152, 219)
+            btnPreviewFile.ForeColor = Color.White
+            btnPreviewFile.FlatStyle = FlatStyle.Flat
+            btnPreviewFile.FlatAppearance.BorderSize = 0
+            btnPreviewFile.Font = New Font("Segoe UI", 9, FontStyle.Bold)
 
-        ' ค้นหาไฟล์ Mission ที่เกี่ยวข้อง
-        Dim missionFiles = FindMissionFiles(record)
-        Dim missionFileInfo As String = If(missionFiles.Count > 0,
+            ' Enable ถ้ามีไฟล์ path และไฟล์มีอยู่จริง
+            Dim fileExists As Boolean = Not String.IsNullOrEmpty(relatedFilePath) AndAlso File.Exists(relatedFilePath)
+            btnPreviewFile.Enabled = True
+
+            ' เปลี่ยนสีปุ่มตามสถานะไฟล์
+            If fileExists Then
+                btnPreviewFile.BackColor = Color.FromArgb(52, 152, 219)  ' สีฟ้า = ไฟล์มีอยู่
+            Else
+                btnPreviewFile.BackColor = Color.FromArgb(149, 165, 166)  ' สีเทา = ไฟล์ไม่มี
+            End If
+
+            AddHandler btnPreviewFile.Click, Sub()
+                                                 If Not String.IsNullOrEmpty(relatedFilePath) Then
+                                                     If File.Exists(relatedFilePath) Then
+                                                         Console.WriteLine($"เปิดไฟล์: {relatedFilePath}")
+                                                         OpenFileWithErrorHandling(relatedFilePath)
+                                                     Else
+                                                         MessageBox.Show($"ไม่พบไฟล์ที่ระบุ:{vbCrLf}{relatedFilePath}{vbCrLf}{vbCrLf}ไฟล์อาจถูกย้าย, ลบ, หรือเครือข่ายไม่เชื่อมต่อ",
+                                                                    "ไม่พบไฟล์", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                                                     End If
+                                                 Else
+                                                     ' แสดง message และเสนอทางเลือก
+                                                     Dim message As String = $"ไม่มีข้อมูลไฟล์ที่เกี่ยวข้องสำหรับ {record.ProductCode}"
+                                                     message += vbCrLf & vbCrLf & "ต้องการเปิดโฟลเดอร์เครือข่ายเพื่อค้นหาไฟล์เองหรือไม่?"
+
+                                                     If MessageBox.Show(message, "ไม่มีข้อมูลไฟล์", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
+                                                         Try
+                                                             Dim networkFolder As String = "\\10.24.179.2\OAFAB\OA2FAB\Film charecter check"
+                                                             Process.Start("explorer.exe", networkFolder)
+                                                         Catch ex As Exception
+                                                             MessageBox.Show($"ไม่สามารถเปิดโฟลเดอร์เครือข่ายได้: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+                                                         End Try
+                                                     End If
+                                                 End If
+                                             End Sub
+
+            ' ค้นหาไฟล์ Mission ที่เกี่ยวข้อง
+            Dim missionFiles = FindMissionFiles(record)
+            Dim missionFileInfo As String = If(missionFiles.Count > 0,
                                           $"Mission Files: {missionFiles.Count} ไฟล์",
                                           "ไม่พบไฟล์ Mission")
 
-        Dim lblMissionFiles As New Label()
-        lblMissionFiles.Text = $"📋 {missionFileInfo}"
-        lblMissionFiles.Location = New Point(15, 110)
-        lblMissionFiles.Size = New Size(formWidth - 220, 25)
-        lblMissionFiles.Font = New Font("Segoe UI", 10)
-        lblMissionFiles.ForeColor = Color.FromArgb(142, 68, 173)
+            Dim lblMissionFiles As New Label()
+            lblMissionFiles.Text = $"📋 {missionFileInfo}"
+            lblMissionFiles.Location = New Point(15, 110)
+            lblMissionFiles.Size = New Size(formWidth - 220, 25)
+            lblMissionFiles.Font = New Font("Segoe UI", 10)
+            lblMissionFiles.ForeColor = Color.FromArgb(142, 68, 173)
 
-        ' ปุ่มเปิดไฟล์ Mission
-        Dim btnOpenMission As New Button()
-        btnOpenMission.Text = "📋 Mission"
-        btnOpenMission.Location = New Point(formWidth - 210, 107)
-        btnOpenMission.Size = New Size(90, 30)
-        btnOpenMission.BackColor = Color.FromArgb(142, 68, 173)
-        btnOpenMission.ForeColor = Color.White
-        btnOpenMission.FlatStyle = FlatStyle.Flat
-        btnOpenMission.FlatAppearance.BorderSize = 0
-        btnOpenMission.Font = New Font("Segoe UI", 9, FontStyle.Bold)
-        btnOpenMission.Enabled = missionFiles.Count > 0
-        AddHandler btnOpenMission.Click, Sub()
-                                             If missionFiles.Count > 0 Then
-                                                 OpenFileWithErrorHandling(missionFiles(0).FullName)
-                                             End If
-                                         End Sub
+            ' ปุ่มเปิดไฟล์ Mission
+            Dim btnOpenMission As New Button()
+            btnOpenMission.Text = "📋 Mission"
+            btnOpenMission.Location = New Point(formWidth - 210, 107)
+            btnOpenMission.Size = New Size(90, 30)
+            btnOpenMission.BackColor = Color.FromArgb(142, 68, 173)
+            btnOpenMission.ForeColor = Color.White
+            btnOpenMission.FlatStyle = FlatStyle.Flat
+            btnOpenMission.FlatAppearance.BorderSize = 0
+            btnOpenMission.Font = New Font("Segoe UI", 9, FontStyle.Bold)
+            btnOpenMission.Enabled = missionFiles.Count > 0
+            AddHandler btnOpenMission.Click, Sub()
+                                                 If missionFiles.Count > 0 Then
+                                                     OpenFileWithErrorHandling(missionFiles(0).FullName)
+                                                 End If
+                                             End Sub
 
-        ' ปุ่มเปิดโฟลเดอร์
-        Dim btnOpenFolder As New Button()
-        btnOpenFolder.Text = "📁 โฟลเดอร์"
-        btnOpenFolder.Location = New Point(formWidth - 110, 107)
-        btnOpenFolder.Size = New Size(100, 30)
-        btnOpenFolder.BackColor = Color.FromArgb(46, 204, 113)
-        btnOpenFolder.ForeColor = Color.White
-        btnOpenFolder.FlatStyle = FlatStyle.Flat
-        btnOpenFolder.FlatAppearance.BorderSize = 0
-        btnOpenFolder.Font = New Font("Segoe UI", 9, FontStyle.Bold)
-        AddHandler btnOpenFolder.Click, Sub()
-                                            OpenMissionFolder(record)
-                                        End Sub
+            ' ปุ่มเปิดโฟลเดอร์
+            Dim btnOpenFolder As New Button()
+            btnOpenFolder.Text = "📁 โฟลเดอร์"
+            btnOpenFolder.Location = New Point(formWidth - 110, 107)
+            btnOpenFolder.Size = New Size(100, 30)
+            btnOpenFolder.BackColor = Color.FromArgb(46, 204, 113)
+            btnOpenFolder.ForeColor = Color.White
+            btnOpenFolder.FlatStyle = FlatStyle.Flat
+            btnOpenFolder.FlatAppearance.BorderSize = 0
+            btnOpenFolder.Font = New Font("Segoe UI", 9, FontStyle.Bold)
+            AddHandler btnOpenFolder.Click, Sub()
+                                                OpenMissionFolder(record)
+                                            End Sub
 
-        filePanel.Controls.AddRange({lblFileTitle, lblExcelInfo, lblFileInfo, btnPreviewFile, 
+            filePanel.Controls.AddRange({lblFileTitle, lblExcelInfo, lblFileInfo, btnPreviewFile,
                                    lblMissionFiles, btnOpenMission, btnOpenFolder})
-        currentY += filePanel.Height + panelMargin
+            currentY += filePanel.Height + panelMargin
 
-        ' Action Panel - ใช้ FlowLayoutPanel
-        Dim actionPanel As New Panel()
-        actionPanel.Size = New Size(formWidth, 100)
-        actionPanel.Location = New Point(15, currentY)
-        actionPanel.BackColor = Color.White
-        actionPanel.BorderStyle = BorderStyle.FixedSingle
-        actionPanel.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+            ' Action Panel - ใช้ FlowLayoutPanel
+            Dim actionPanel As New Panel()
+            actionPanel.Size = New Size(formWidth, 100)
+            actionPanel.Location = New Point(15, currentY)
+            actionPanel.BackColor = Color.White
+            actionPanel.BorderStyle = BorderStyle.FixedSingle
+            actionPanel.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
 
-        Dim lblActionTitle As New Label()
-        lblActionTitle.Text = "⚡ การดำเนินการ"
-        lblActionTitle.Font = New Font("Segoe UI", 12, FontStyle.Bold)
-        lblActionTitle.Location = New Point(15, 15)
-        lblActionTitle.AutoSize = True
-        lblActionTitle.ForeColor = Color.FromArgb(52, 73, 94)
+            Dim lblActionTitle As New Label()
+            lblActionTitle.Text = "⚡ การดำเนินการ"
+            lblActionTitle.Font = New Font("Segoe UI", 12, FontStyle.Bold)
+            lblActionTitle.Location = New Point(15, 15)
+            lblActionTitle.AutoSize = True
+            lblActionTitle.ForeColor = Color.FromArgb(52, 73, 94)
 
-        ' ใช้ FlowLayoutPanel สำหรับปุ่มต่างๆ
-        Dim actionFlow As New FlowLayoutPanel()
-        actionFlow.Location = New Point(15, 50)
-        actionFlow.Size = New Size(formWidth - 30, 40)
-        actionFlow.FlowDirection = FlowDirection.LeftToRight
-        actionFlow.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+            ' ใช้ FlowLayoutPanel สำหรับปุ่มต่างๆ
+            Dim actionFlow As New FlowLayoutPanel()
+            actionFlow.Location = New Point(15, 50)
+            actionFlow.Size = New Size(formWidth - 30, 40)
+            actionFlow.FlowDirection = FlowDirection.LeftToRight
+            actionFlow.Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
 
-        ' ปุ่มเปลี่ยนสถานะเป็น "สำเร็จ"
-        Dim btnMarkComplete As New Button()
-        btnMarkComplete.Text = "✅ ทำเครื่องหมายสำเร็จ"
-        btnMarkComplete.Size = New Size(160, 35)
-        btnMarkComplete.BackColor = Color.FromArgb(39, 174, 96)
-        btnMarkComplete.ForeColor = Color.White
-        btnMarkComplete.FlatStyle = FlatStyle.Flat
-        btnMarkComplete.FlatAppearance.BorderSize = 0
-        btnMarkComplete.Font = New Font("Segoe UI", 9, FontStyle.Bold)
-        btnMarkComplete.Margin = New Padding(0, 0, 10, 0)
+            ' ปุ่มเปลี่ยนสถานะเป็น "สำเร็จ"
+            Dim btnMarkComplete As New Button()
+            btnMarkComplete.Text = "✅ ทำเครื่องหมายสำเร็จ"
+            btnMarkComplete.Size = New Size(160, 35)
+            btnMarkComplete.BackColor = Color.FromArgb(39, 174, 96)
+            btnMarkComplete.ForeColor = Color.White
+            btnMarkComplete.FlatStyle = FlatStyle.Flat
+            btnMarkComplete.FlatAppearance.BorderSize = 0
+            btnMarkComplete.Font = New Font("Segoe UI", 9, FontStyle.Bold)
+            btnMarkComplete.Margin = New Padding(0, 0, 10, 0)
 
-        ' ปุ่มรีเซ็ตสถานะ
-        Dim btnReset As New Button()
-        btnReset.Text = "🔄 รีเซ็ตสถานะ"
-        btnReset.Size = New Size(120, 35)
-        btnReset.BackColor = Color.FromArgb(230, 126, 34)
-        btnReset.ForeColor = Color.White
-        btnReset.FlatStyle = FlatStyle.Flat
-        btnReset.FlatAppearance.BorderSize = 0
-        btnReset.Font = New Font("Segoe UI", 9, FontStyle.Bold)
-        btnReset.Margin = New Padding(0, 0, 10, 0)
+            ' ปุ่มรีเซ็ตสถานะ
+            Dim btnReset As New Button()
+            btnReset.Text = "🔄 รีเซ็ตสถานะ"
+            btnReset.Size = New Size(120, 35)
+            btnReset.BackColor = Color.FromArgb(230, 126, 34)
+            btnReset.ForeColor = Color.White
+            btnReset.FlatStyle = FlatStyle.Flat
+            btnReset.FlatAppearance.BorderSize = 0
+            btnReset.Font = New Font("Segoe UI", 9, FontStyle.Bold)
+            btnReset.Margin = New Padding(0, 0, 10, 0)
 
-        ' ปุ่มดูรายละเอียด Mission
-        Dim btnViewDetails As New Button()
-        btnViewDetails.Text = "📄 ดูรายละเอียด"
-        btnViewDetails.Size = New Size(120, 35)
-        btnViewDetails.BackColor = Color.FromArgb(52, 152, 219)
-        btnViewDetails.ForeColor = Color.White
-        btnViewDetails.FlatStyle = FlatStyle.Flat
-        btnViewDetails.FlatAppearance.BorderSize = 0
-        btnViewDetails.Font = New Font("Segoe UI", 9, FontStyle.Bold)
-        btnViewDetails.Margin = New Padding(0, 0, 10, 0)
+            ' ปุ่มดูรายละเอียด Mission
+            Dim btnViewDetails As New Button()
+            btnViewDetails.Text = "📄 ดูรายละเอียด"
+            btnViewDetails.Size = New Size(120, 35)
+            btnViewDetails.BackColor = Color.FromArgb(52, 152, 219)
+            btnViewDetails.ForeColor = Color.White
+            btnViewDetails.FlatStyle = FlatStyle.Flat
+            btnViewDetails.FlatAppearance.BorderSize = 0
+            btnViewDetails.Font = New Font("Segoe UI", 9, FontStyle.Bold)
+            btnViewDetails.Margin = New Padding(0, 0, 10, 0)
 
-        ' ปุ่มปิด
-        Dim btnClose As New Button()
-        btnClose.Text = "❌ ปิด"
-        btnClose.Size = New Size(80, 35)
-        btnClose.BackColor = Color.FromArgb(149, 165, 166)
-        btnClose.ForeColor = Color.White
-        btnClose.FlatStyle = FlatStyle.Flat
-        btnClose.FlatAppearance.BorderSize = 0
-        btnClose.Font = New Font("Segoe UI", 9, FontStyle.Bold)
-        btnClose.DialogResult = DialogResult.Cancel
+            ' ปุ่มปิด
+            Dim btnClose As New Button()
+            btnClose.Text = "❌ ปิด"
+            btnClose.Size = New Size(80, 35)
+            btnClose.BackColor = Color.FromArgb(149, 165, 166)
+            btnClose.ForeColor = Color.White
+            btnClose.FlatStyle = FlatStyle.Flat
+            btnClose.FlatAppearance.BorderSize = 0
+            btnClose.Font = New Font("Segoe UI", 9, FontStyle.Bold)
+            btnClose.DialogResult = DialogResult.Cancel
 
-        actionFlow.Controls.AddRange({btnMarkComplete, btnReset, btnViewDetails, btnClose})
-        actionPanel.Controls.AddRange({lblActionTitle, actionFlow})
+            actionFlow.Controls.AddRange({btnMarkComplete, btnReset, btnViewDetails, btnClose})
+            actionPanel.Controls.AddRange({lblActionTitle, actionFlow})
 
-        ' Event Handlers
-        AddHandler btnMarkComplete.Click, Sub()
-                                              If MessageBox.Show("ยืนยันการทำเครื่องหมายว่า Mission นี้สำเร็จแล้ว?",
+            ' Event Handlers
+            AddHandler btnMarkComplete.Click, Sub()
+                                                  If MessageBox.Show("ยืนยันการทำเครื่องหมายว่า Mission นี้สำเร็จแล้ว?",
                                                                "ยืนยัน", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
-                                                  record.MissionStatus = "สำเร็จ"
-                                                  If UpdateMissionStatus(record) Then
-                                                      ' อัปเดตการแสดงผลในตาราง
-                                                      dgvHistory.Rows(rowIndex).Cells("MissionStatus").Value = "สำเร็จ"
-                                                      dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Value = "✅ สำเร็จ"
-                                                      dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Style.ForeColor = Color.Green
+                                                      record.MissionStatus = "สำเร็จ"
+                                                      If UpdateMissionStatus(record) Then
+                                                          ' อัปเดตการแสดงผลในตาราง
+                                                          dgvHistory.Rows(rowIndex).Cells("MissionStatus").Value = "สำเร็จ"
+                                                          dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Value = "✅ สำเร็จ"
+                                                          dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Style.ForeColor = Color.Green
 
-                                                      MessageBox.Show("อัปเดตสถานะ Mission เป็น 'สำเร็จ' แล้ว",
+                                                          MessageBox.Show("อัปเดตสถานะ Mission เป็น 'สำเร็จ' แล้ว",
                                                                      "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                                                      statusForm.Close()
+                                                          statusForm.Close()
+                                                      End If
                                                   End If
-                                              End If
-                                          End Sub
+                                              End Sub
 
-        AddHandler btnReset.Click, Sub()
-                                       If MessageBox.Show("ยืนยันการรีเซ็ตสถานะ Mission กลับเป็น 'ไม่มี'?",
+            AddHandler btnReset.Click, Sub()
+                                           If MessageBox.Show("ยืนยันการรีเซ็ตสถานะ Mission กลับเป็น 'ไม่มี'?",
                                                         "ยืนยัน", MessageBoxButtons.YesNo, MessageBoxIcon.Question) = DialogResult.Yes Then
-                                           record.MissionStatus = "ไม่มี"
-                                           If UpdateMissionStatus(record) Then
-                                               ' อัปเดตการแสดงผลในตาราง
-                                               dgvHistory.Rows(rowIndex).Cells("MissionStatus").Value = "ไม่มี"
-                                               dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Value = "🚀 สร้าง"
-                                               dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Style.ForeColor = Color.Blue
+                                               record.MissionStatus = "ไม่มี"
+                                               If UpdateMissionStatus(record) Then
+                                                   ' อัปเดตการแสดงผลในตาราง
+                                                   dgvHistory.Rows(rowIndex).Cells("MissionStatus").Value = "ไม่มี"
+                                                   dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Value = "🚀 สร้าง"
+                                                   dgvHistory.Rows(rowIndex).Cells("btnCreateMission").Style.ForeColor = Color.Blue
 
-                                               MessageBox.Show("รีเซ็ตสถานะ Mission แล้ว",
+                                                   MessageBox.Show("รีเซ็ตสถานะ Mission แล้ว",
                                                               "สำเร็จ", MessageBoxButtons.OK, MessageBoxIcon.Information)
-                                               statusForm.Close()
+                                                   statusForm.Close()
+                                               End If
                                            End If
-                                       End If
-                                   End Sub
+                                       End Sub
 
-        AddHandler btnViewDetails.Click, Sub()
-                                             ShowMissionDetailsDialog(record)
-                                         End Sub
+            AddHandler btnViewDetails.Click, Sub()
+                                                 ShowMissionDetailsDialog(record)
+                                             End Sub
 
-        ' เพิ่ม Panels เข้าฟอร์ม
-        statusForm.Controls.AddRange({headerPanel, infoPanel, filePanel, actionPanel})
+            ' เพิ่ม Panels เข้าฟอร์ม
+            statusForm.Controls.AddRange({headerPanel, infoPanel, filePanel, actionPanel})
 
-        ' แสดงฟอร์ม
-        statusForm.ShowDialog()
+            ' แสดงฟอร์ม
+            statusForm.ShowDialog()
 
-        Return record.MissionStatus
+            Return record.MissionStatus
 
-    Catch ex As Exception
-        MessageBox.Show($"เกิดข้อผิดพลาดในการตรวจสอบสถานะ Mission: {ex.Message}",
+        Catch ex As Exception
+            MessageBox.Show($"เกิดข้อผิดพลาดในการตรวจสอบสถานะ Mission: {ex.Message}",
                        "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-        Console.WriteLine($"Error in CheckMissionStatus: {ex.Message}")
-        Return ""
-    End Try
-End Function
+            Console.WriteLine($"Error in CheckMissionStatus: {ex.Message}")
+            Return ""
+        End Try
+    End Function
 
-''' <summary>
-''' ค้นหาไฟล์ที่เกี่ยวข้องตาม pattern
-''' </summary>
-''' <param name="searchPattern">รูปแบบการค้นหา</param>
-''' <returns>ไฟล์ที่พบ หรือ Nothing ถ้าไม่พบ</returns>
-Private Function FindRelatedFile(searchPattern As String) As FileInfo
-    Try
-        ' ค้นหาใน folder ต่างๆ ที่อาจมีไฟล์
-        Dim searchFolders() As String = {
-            Path.Combine(Application.StartupPath, "Files"),
-            Path.Combine(Application.StartupPath, "Documents"),
-            Path.Combine(Application.StartupPath, "Data"),
-            Application.StartupPath
-        }
-
-        For Each folder In searchFolders
-            If Directory.Exists(folder) Then
-                Dim files = Directory.GetFiles(folder, searchPattern, SearchOption.AllDirectories)
-                If files.Length > 0 Then
-                    Return New FileInfo(files(0))
-                End If
+    ''' <summary>
+    ''' อ่านข้อมูลจาก Mission file
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกน</param>
+    ''' <returns>Dictionary ของข้อมูล Mission หรือ Nothing ถ้าไม่พบ</returns>
+    Private Function ReadMissionData(record As ScanDataRecord) As Dictionary(Of String, String)
+        Try
+            ' ค้นหาไฟล์ Mission
+            Dim missionFiles = FindMissionFiles(record)
+            If missionFiles.Count = 0 Then
+                Console.WriteLine($"ไม่พบไฟล์ Mission สำหรับ record ID: {record.Id}")
+                Return Nothing
             End If
-        Next
 
-        Return Nothing
+            ' อ่านไฟล์ Mission แรกที่เจอ
+            Dim missionFile = missionFiles(0)
+            Console.WriteLine($"อ่านไฟล์ Mission: {missionFile.FullName}")
 
-    Catch ex As Exception
-        Console.WriteLine($"Error in FindRelatedFile: {ex.Message}")
-        Return Nothing
-    End Try
-End Function
+            Dim content As String = File.ReadAllText(missionFile.FullName, Encoding.UTF8)
+            Dim data As New Dictionary(Of String, String)()
 
-''' <summary>
-''' ค้นหาไฟล์ Mission ที่เกี่ยวข้องกับ record
-''' </summary>
-''' <param name="record">ข้อมูลการสแกน</param>
-''' <returns>รายการไฟล์ Mission</returns>
-Private Function FindMissionFiles(record As ScanDataRecord) As List(Of FileInfo)
-    Dim files As New List(Of FileInfo)()
+            ' แยกข้อมูลจากไฟล์ (รูปแบบ "key: value")
+            Dim lines() As String = content.Split({vbCrLf, vbLf}, StringSplitOptions.RemoveEmptyEntries)
 
-    Try
-        ' ค้นหาไฟล์ Mission
-        Dim missionDir As String = Path.Combine(Application.StartupPath, "Missions")
-        If Directory.Exists(missionDir) Then
-            Dim missionPattern As String = $"MISSION_*_{record.Id}.txt"
-            Dim missionFiles = Directory.GetFiles(missionDir, missionPattern)
-
-            For Each file In missionFiles
-                files.Add(New FileInfo(file))
+            For Each line In lines
+                If line.Contains(":") Then
+                    Dim parts() As String = line.Split({":", "="}, 2, StringSplitOptions.None)
+                    If parts.Length = 2 Then
+                        Dim key As String = parts(0).Trim()
+                        Dim value As String = parts(1).Trim()
+                        data(key) = value
+                        Console.WriteLine($"Mission data: {key} = {value}")
+                    End If
+                End If
             Next
 
-            ' ถ้าไม่เจอแบบ specific ให้ลองค้นหาแบบ general
-            If files.Count = 0 Then
-                Dim generalPattern As String = $"*{record.ProductCode}*"
-                Dim generalFiles = Directory.GetFiles(missionDir, generalPattern)
-                For Each file In generalFiles
+            Return data
+
+        Catch ex As Exception
+            Console.WriteLine($"Error reading Mission data: {ex.Message}")
+            Return Nothing
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ค้นหาไฟล์ Mission ที่เกี่ยวข้องกับ record
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกน</param>
+    ''' <returns>รายการไฟล์ Mission</returns>
+    Private Function FindMissionFiles(record As ScanDataRecord) As List(Of FileInfo)
+        Dim files As New List(Of FileInfo)()
+
+        Try
+            ' ค้นหาไฟล์ Mission
+            Dim missionDir As String = Path.Combine(Application.StartupPath, "Missions")
+            If Directory.Exists(missionDir) Then
+                Dim missionPattern As String = $"MISSION_*_{record.Id}.txt"
+                Dim missionFiles = Directory.GetFiles(missionDir, missionPattern)
+
+                For Each file In missionFiles
                     files.Add(New FileInfo(file))
                 Next
+
+                ' ถ้าไม่เจอแบบ specific ให้ลองค้นหาแบบ general
+                If files.Count = 0 Then
+                    Dim generalPattern As String = $"*{record.ProductCode}*"
+                    Dim generalFiles = Directory.GetFiles(missionDir, generalPattern)
+                    For Each file In generalFiles
+                        files.Add(New FileInfo(file))
+                    Next
+                End If
             End If
-        End If
 
-    Catch ex As Exception
-        Console.WriteLine($"Error in FindMissionFiles: {ex.Message}")
-    End Try
+        Catch ex As Exception
+            Console.WriteLine($"Error in FindMissionFiles: {ex.Message}")
+        End Try
 
-    Return files
-End Function
+        Return files
+    End Function
 
-''' <summary>
-''' เปิดโฟลเดอร์ Mission
-''' </summary>
-''' <param name="record">ข้อมูลการสแกน</param>
-Private Sub OpenMissionFolder(record As ScanDataRecord)
-    Try
-        Dim missionDir As String = Path.Combine(Application.StartupPath, "Missions")
-        If Directory.Exists(missionDir) Then
-            Process.Start("explorer.exe", missionDir)
-        Else
-            MessageBox.Show("ไม่พบโฟลเดอร์ Mission", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-        End If
-    Catch ex As Exception
-        MessageBox.Show($"ไม่สามารถเปิดโฟลเดอร์ได้: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
-    End Try
-End Sub
+    ''' <summary>
+    ''' เปิดโฟลเดอร์ Mission
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกน</param>
+    Private Sub OpenMissionFolder(record As ScanDataRecord)
+        Try
+            Dim missionDir As String = Path.Combine(Application.StartupPath, "Missions")
+            If Directory.Exists(missionDir) Then
+                Process.Start("explorer.exe", missionDir)
+            Else
+                MessageBox.Show("ไม่พบโฟลเดอร์ Mission", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End If
+        Catch ex As Exception
+            MessageBox.Show($"ไม่สามารถเปิดโฟลเดอร์ได้: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        End Try
+    End Sub
+
 
     ''' <summary>
     ''' แสดงรายละเอียด Mission ที่เสร็จสิ้นแล้ว
