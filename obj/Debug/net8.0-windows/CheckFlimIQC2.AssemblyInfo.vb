@@ -16,10 +16,10 @@ Imports System.Reflection
 <Assembly: System.Reflection.AssemblyCompanyAttribute("CheckFlimIQC2"),  _
  Assembly: System.Reflection.AssemblyConfigurationAttribute("Debug"),  _
  Assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0"),  _
- Assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+7f0bc28435edd300c3aaf6bb8faaecbf3c47eb50"),  _
+ Assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+02d1817c6cb20e6ba95c2cb728a4f2d8d6b6d6ca"),  _
  Assembly: System.Reflection.AssemblyProductAttribute("CheckFlimIQC2"),  _
  Assembly: System.Reflection.AssemblyTitleAttribute("QR Code Scanner System"),  _
- Assembly: System.Reflection.AssemblyVersionAttribute("1.0.1.0"),  _
+ Assembly: System.Reflection.AssemblyVersionAttribute("1.0.5.0"),  _
  Assembly: System.Runtime.Versioning.TargetPlatformAttribute("Windows7.0"),  _
  Assembly: System.Runtime.Versioning.SupportedOSPlatformAttribute("Windows7.0")> 
 

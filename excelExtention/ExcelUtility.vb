@@ -9,7 +9,7 @@ Imports System.Text.RegularExpressions
 
 ''' <summary>
 ''' คลาสสำหรับจัดการการทำงานกับไฟล์ Excel
-''' </summary>
+''' </summary> 
 Public Class ExcelUtility
 
 #Region "Constants"
@@ -1710,6 +1710,378 @@ Public Class ExcelUtility
         End Try
     End Function
 #End Region
+
+    ''' <summary>
+    ''' โหลดข้อมูล Excel ทั้งหมดเข้า Memory พร้อม Progress Reporting
+    ''' </summary>
+    ''' <param name="excelPath">เส้นทางไฟล์ Excel</param>
+    ''' <param name="progress">Progress Reporter</param>
+    ''' <returns>ผลลัพธ์การโหลด</returns>
+    Public Shared Function LoadDataFromExcelWithProgress(excelPath As String, progress As IProgress(Of Object)) As LoadResult
+        Dim result As New LoadResult()
+        result.StartTiming()
+
+        Try
+            Console.WriteLine($"เริ่มโหลดข้อมูล Excel พร้อม Progress: {Path.GetFileName(excelPath)}")
+
+            ' ตรวจสอบไฟล์
+            If Not File.Exists(excelPath) Then
+                result.SetError($"ไม่พบไฟล์ Excel: {excelPath}")
+                Return result
+            End If
+
+            ' รายงาน Progress เริ่มต้น
+            progress?.Report(New With {
+                .Message = "กำลังตรวจสอบวิธีการโหลด...",
+                .ProcessedRows = 0,
+                .TotalRows = 0
+            })
+
+            ' ลองใช้ ClosedXML ก่อน
+            If IsClosedXMLAvailable() Then
+                Console.WriteLine("โหลดข้อมูลด้วย ClosedXML พร้อม Progress")
+                Return LoadDataWithClosedXMLProgress(excelPath, progress)
+            End If
+
+            ' ใช้ Office Interop เป็นทางเลือก
+            If IsOfficeInstalled() Then
+                Console.WriteLine("โหลดข้อมูลด้วย Office Interop พร้อม Progress")
+                Return LoadDataWithInteropProgress(excelPath, progress)
+            End If
+
+            ' ใช้ข้อมูล fallback
+            Console.WriteLine("ใช้ข้อมูล fallback พร้อม Progress")
+            Return LoadFallbackDataWithProgress(progress)
+
+        Catch ex As Exception
+            result.SetError($"เกิดข้อผิดพลาดในการโหลดข้อมูล: {ex.Message}")
+            Console.WriteLine($"Error in LoadDataFromExcelWithProgress: {ex.Message}")
+            
+            progress?.Report(New With {
+                .Message = $"เกิดข้อผิดพลาด: {ex.Message}",
+                .ProcessedRows = 0,
+                .TotalRows = 0
+            })
+        Finally
+            result.StopTiming()
+        End Try
+
+        Return result
+    End Function
+
+    ''' <summary>
+    ''' โหลดข้อมูลด้วย ClosedXML พร้อม Progress
+    ''' </summary>
+    Private Shared Function LoadDataWithClosedXMLProgress(excelPath As String, progress As IProgress(Of Object)) As LoadResult
+        Dim result As New LoadResult()
+        result.StartTiming()
+
+        Try
+            ' ตรวจสอบว่าไฟล์ถูกใช้งานอยู่หรือไม่
+            If IsFileInUse(excelPath) Then
+                result.SetError($"ไฟล์ Excel '{Path.GetFileName(excelPath)}' กำลังถูกใช้งานอยู่")
+                Return result
+            End If
+
+            progress?.Report(New With {
+                .Message = "กำลังเปิดไฟล์ Excel...",
+                .ProcessedRows = 0,
+                .TotalRows = 0
+            })
+
+            Dim xlType = Type.GetType("ClosedXML.Excel.XLWorkbook, ClosedXML", False, True)
+            If xlType Is Nothing Then
+                result.SetError("ไม่พบ ClosedXML ในระบบ")
+                Return result
+            End If
+
+            ' สร้าง workbook ด้วย Reflection
+            Dim workbookConstructor = xlType.GetConstructor(New Type() {GetType(String)})
+            If workbookConstructor Is Nothing Then
+                result.SetError("ไม่พบ constructor ที่เหมาะสมสำหรับ XLWorkbook")
+                Return result
+            End If
+
+            Dim workbook = workbookConstructor.Invoke(New Object() {excelPath})
+            If workbook Is Nothing Then
+                result.SetError("ไม่สามารถเปิดไฟล์ Excel ได้")
+                Return result
+            End If
+
+            Try
+                progress?.Report(New With {
+                    .Message = "กำลังวิเคราะห์ขนาดข้อมูล...",
+                    .ProcessedRows = 0,
+                    .TotalRows = 0
+                })
+
+                ' เข้าถึง worksheet แรก
+                Dim worksheetMethod = xlType.GetMethod("Worksheet", New Type() {GetType(Integer)})
+                Dim worksheet = worksheetMethod.Invoke(workbook, New Object() {1})
+
+                ' หาจำนวนแถว
+                Dim rowCount = GetRowCount(worksheet)
+                Console.WriteLine($"กำลังโหลดข้อมูล {rowCount:N0} แถว...")
+
+                progress?.Report(New With {
+                    .Message = "เริ่มโหลดข้อมูล...",
+                    .ProcessedRows = 0,
+                    .TotalRows = rowCount
+                })
+
+                ' โหลดข้อมูลทั้งหมดพร้อม Progress
+                Dim data As New List(Of ExcelRowData)()
+                Dim cellMethod = worksheet.GetType().GetMethod("Cell", New Type() {GetType(Integer), GetType(Integer)})
+                Dim processedCount As Integer = 0
+                Dim lastReportTime = DateTime.Now
+
+                For row As Integer = 1 To rowCount
+                    Try
+                        Dim rowData = LoadRowData(worksheet, cellMethod, row)
+                        If rowData IsNot Nothing Then
+                            data.Add(rowData)
+                            result.AddRow(rowData)
+                        Else
+                            result.AddSkippedRow()
+                        End If
+                        
+                        processedCount += 1
+
+                        ' อัพเดท Progress ทุกๆ 500 แถว หรือทุกๆ 2 วินาที
+                        If processedCount Mod 500 = 0 OrElse (DateTime.Now - lastReportTime).TotalSeconds >= 2 Then
+                            progress?.Report(New With {
+                                .Message = "กำลังโหลดข้อมูล...",
+                                .ProcessedRows = processedCount,
+                                .TotalRows = rowCount
+                            })
+                            lastReportTime = DateTime.Now
+                        End If
+
+                    Catch ex As Exception
+                        Console.WriteLine($"ข้ามแถว {row}: {ex.Message}")
+                        result.AddSkippedRow()
+                        Continue For
+                    End Try
+                Next
+
+                result.Data = data
+                result.SetSuccess($"โหลดข้อมูล {data.Count:N0} แถว สำเร็จ")
+
+                progress?.Report(New With {
+                    .Message = "โหลดข้อมูลสำเร็จ",
+                    .ProcessedRows = data.Count,
+                    .TotalRows = rowCount
+                })
+
+            Finally
+                ' ปิด workbook
+                Try
+                    Dim disposeMethod = xlType.GetMethod("Dispose")
+                    If disposeMethod IsNot Nothing Then
+                        disposeMethod.Invoke(workbook, Nothing)
+                    End If
+                Catch ex As Exception
+                    Console.WriteLine($"Warning: ไม่สามารถปิด workbook ได้: {ex.Message}")
+                End Try
+            End Try
+
+        Catch ex As Exception
+            result.SetError($"เกิดข้อผิดพลาดในการโหลดด้วย ClosedXML: {ex.Message}")
+            Console.WriteLine($"Error in LoadDataWithClosedXMLProgress: {ex.Message}")
+        Finally
+            result.StopTiming()
+        End Try
+
+        Return result
+    End Function
+
+    ''' <summary>
+    ''' โหลดข้อมูลด้วย Office Interop พร้อม Progress
+    ''' </summary>
+    Private Shared Function LoadDataWithInteropProgress(excelPath As String, progress As IProgress(Of Object)) As LoadResult
+        Dim result As New LoadResult()
+        result.StartTiming()
+
+        Dim excelApp As Microsoft.Office.Interop.Excel.Application = Nothing
+        Dim workbook As Microsoft.Office.Interop.Excel.Workbook = Nothing
+        Dim worksheet As Microsoft.Office.Interop.Excel.Worksheet = Nothing
+
+        Try
+            Console.WriteLine("เริ่มโหลดข้อมูลด้วย Office Interop พร้อม Progress")
+
+            progress?.Report(New With {
+                .Message = "กำลังเริ่มต้น Excel...",
+                .ProcessedRows = 0,
+                .TotalRows = 0
+            })
+
+            ' เริ่มต้น Excel
+            excelApp = New Microsoft.Office.Interop.Excel.Application()
+            excelApp.Visible = False
+            excelApp.DisplayAlerts = False
+            excelApp.ScreenUpdating = False
+
+            progress?.Report(New With {
+                .Message = "กำลังเปิดไฟล์ Excel...",
+                .ProcessedRows = 0,
+                .TotalRows = 0
+            })
+
+            ' เปิดไฟล์
+            workbook = excelApp.Workbooks.Open(excelPath,
+            UpdateLinks:=False,
+            ReadOnly:=True,
+            Format:=5,
+            Password:="",
+            WriteResPassword:="")
+
+            ' ใช้ Sheet แรก
+            worksheet = CType(workbook.Worksheets(1), Microsoft.Office.Interop.Excel.Worksheet)
+
+            ' หา range ที่มีข้อมูล
+            Dim usedRange As Microsoft.Office.Interop.Excel.Range = worksheet.UsedRange
+            Dim rowCount As Integer = Math.Min(usedRange.Rows.Count, MAX_SEARCH_ROWS)
+            Dim colCount As Integer = usedRange.Columns.Count
+
+            Console.WriteLine($"กำลังโหลดข้อมูล {rowCount:N0} แถว, {colCount} คอลัมน์")
+
+            progress?.Report(New With {
+                .Message = "เริ่มโหลดข้อมูล...",
+                .ProcessedRows = 0,
+                .TotalRows = rowCount
+            })
+
+            ' โหลดข้อมูลทั้งหมดพร้อม Progress
+            Dim data As New List(Of ExcelRowData)()
+            Dim processedCount As Integer = 0
+            Dim lastReportTime = DateTime.Now
+
+            For row As Integer = 1 To rowCount
+                Try
+                    Dim rowData = LoadRowDataFromInterop(worksheet, row, colCount)
+                    If rowData IsNot Nothing Then
+                        data.Add(rowData)
+                        result.AddRow(rowData)
+                    Else
+                        result.AddSkippedRow()
+                    End If
+                    
+                    processedCount += 1
+
+                    ' อัพเดท Progress ทุกๆ 250 แถว หรือทุกๆ 2 วินาที
+                    If processedCount Mod 250 = 0 OrElse (DateTime.Now - lastReportTime).TotalSeconds >= 2 Then
+                        progress?.Report(New With {
+                            .Message = "กำลังโหลดข้อมูล...",
+                            .ProcessedRows = processedCount,
+                            .TotalRows = rowCount
+                        })
+                        lastReportTime = DateTime.Now
+                    End If
+
+                Catch ex As Exception
+                    Console.WriteLine($"ข้ามแถว {row}: {ex.Message}")
+                    result.AddSkippedRow()
+                    Continue For
+                End Try
+            Next
+
+            result.Data = data
+            result.SetSuccess($"โหลดข้อมูล {data.Count:N0} แถว สำเร็จ")
+
+            progress?.Report(New With {
+                .Message = "โหลดข้อมูลสำเร็จ",
+                .ProcessedRows = data.Count,
+                .TotalRows = rowCount
+            })
+
+        Catch ex As Exception
+            result.SetError($"เกิดข้อผิดพลาดในการโหลดด้วย Office Interop: {ex.Message}")
+            Console.WriteLine($"Error in LoadDataWithInteropProgress: {ex.Message}")
+        Finally
+            result.StopTiming()
+            CleanupExcelObjects(worksheet, workbook, excelApp)
+        End Try
+
+        Return result
+    End Function
+
+    ''' <summary>
+    ''' โหลดข้อมูล fallback พร้อม Progress
+    ''' </summary>
+    Private Shared Function LoadFallbackDataWithProgress(progress As IProgress(Of Object)) As LoadResult
+        Dim result As New LoadResult()
+        result.StartTiming()
+
+        Try
+            Console.WriteLine("กำลังโหลดข้อมูล fallback พร้อม Progress...")
+
+            ' ข้อมูลตัวอย่าง
+            Dim fallbackData As New Dictionary(Of String, String()) From {
+            {"20414-095200A002", {"SG-C1010-XUA", "LITEON FG PN painting keycaps part no.", "SN1B63L101XU-01N", "US", "SN1B63B42"}},
+            {"20414-095200A003", {"SG-C1010-XMA", "LITEON FG PN painting keycaps part no.", "SN1B63L101XM-01N", "T-CH", "SN1B63B42"}},
+            {"20414-095200A004", {"SG-C1010-XRA", "LITEON FG PN painting keycaps part no.", "SN1B63L101XR-01N", "KOR", "SN1B63B42"}},
+            {"20414-095200A005", {"SG-C1010-33A", "LITEON FG PN painting keycaps part no.", "SN1B63L10133-01N", "THAI", "SN1B63B42"}},
+            {"SN1B63L101XU-01N", {"SG-C1010-XUA", "LITEON FG PN painting keycaps part no.", "20414-095200A002", "US", "SN1B63B42"}},
+            {"SN1B63L101XM-01N", {"SG-C1010-XMA", "LITEON FG PN painting keycaps part no.", "20414-095200A003", "T-CH", "SN1B63B42"}},
+            {"SN1B63L101XR-01N", {"SG-C1010-XRA", "LITEON FG PN painting keycaps part no.", "20414-095200A004", "KOR", "SN1B63B42"}},
+            {"SN1B63L10133-01N", {"SG-C1010-33A", "LITEON FG PN painting keycaps part no.", "20414-095200A005", "THAI", "SN1B63B42"}}
+        }
+
+            progress?.Report(New With {
+                .Message = "กำลังเตรียมข้อมูล fallback...",
+                .ProcessedRows = 0,
+                .TotalRows = fallbackData.Count
+            })
+
+            Dim data As New List(Of ExcelRowData)()
+            Dim rowIndex As Integer = 2
+            Dim processedCount As Integer = 0
+
+            For Each kvp In fallbackData
+                Dim rowData As New ExcelRowData(rowIndex) With {
+                .ProductCode = kvp.Key,
+                .Column1Value = kvp.Value(0),
+                .Column2Value = kvp.Value(1),
+                .Column4Value = kvp.Value(2),
+                .Column5Value = kvp.Value(3),
+                .Column6Value = kvp.Value(4)
+            }
+
+                data.Add(rowData)
+                result.AddRow(rowData)
+                rowIndex += 1
+                processedCount += 1
+
+                progress?.Report(New With {
+                    .Message = "กำลังเตรียมข้อมูล fallback...",
+                    .ProcessedRows = processedCount,
+                    .TotalRows = fallbackData.Count
+                })
+
+                ' เพิ่มการหน่วงเวลาเล็กน้อยเพื่อให้เห็น Progress
+                Threading.Thread.Sleep(50)
+            Next
+
+            result.Data = data
+            result.SetSuccess($"โหลดข้อมูล fallback {data.Count:N0} แถว สำเร็จ")
+            
+            progress?.Report(New With {
+                .Message = "โหลดข้อมูล fallback สำเร็จ",
+                .ProcessedRows = data.Count,
+                .TotalRows = data.Count
+            })
+            
+            Console.WriteLine($"โหลดข้อมูล fallback {data.Count:N0} แถว")
+
+        Catch ex As Exception
+            result.SetError($"เกิดข้อผิดพลาดในการโหลดข้อมูล fallback: {ex.Message}")
+            Console.WriteLine($"Error in LoadFallbackDataWithProgress: {ex.Message}")
+        Finally
+            result.StopTiming()
+        End Try
+
+        Return result
+    End Function
 
 End Class
 

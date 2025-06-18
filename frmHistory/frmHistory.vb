@@ -4,7 +4,7 @@ Imports System.IO
 Imports System.Runtime.InteropServices
 Imports Excel = Microsoft.Office.Interop.Excel
 Imports System.Text
-Imports System.Data
+Imports System.Data 
 Imports System.Threading
 Imports System.ComponentModel
 Imports System.Windows.Forms
@@ -313,27 +313,11 @@ Public Class frmHistory
             ' เริ่มต้น Cache
             dataCache = ExcelDataCache.Instance
 
-            ' แสดงสถานะการโหลด
-            ShowExcelLoadingStatus("กำลังตรวจสอบ Excel Cache...")
+            ' แสดงสถานะพร้อมใช้งาน (ไม่โหลดข้อมูลทันที)
+            ShowExcelLoadingStatus("พร้อมใช้งาน - ข้อมูล Excel จะโหลดเมื่อต้องการใช้งาน")
+            EnableExcelSearchControls(True)
 
-            ' ตรวจสอบว่าข้อมูลโหลดแล้วหรือยัง
-            If Not dataCache.IsLoaded Then
-                ' โหลดข้อมูล Excel ใน Background Thread
-                ShowExcelLoadingStatus("กำลังโหลดข้อมูล Excel...")
-                EnableExcelSearchControls(False)
-
-                Task.Run(Sub() LoadExcelDataAsync())
-            Else
-                ' ข้อมูลโหลดแล้ว
-                ShowExcelLoadingStatus($"ข้อมูล Excel พร้อมใช้งาน: {dataCache.RowCount} แถว")
-                EnableExcelSearchControls(True)
-
-                ' ตรวจสอบว่าข้อมูลเก่าไปหรือไม่ (เก่ากว่า 1 ชั่วโมง)
-                If dataCache.ShouldRefresh(60) Then
-                    ShowExcelLoadingStatus("ข้อมูลเก่า กำลังรีเฟรช...")
-                    Task.Run(Sub() RefreshExcelDataAsync())
-                End If
-            End If
+            Console.WriteLine("Excel Cache เริ่มต้นเรียบร้อย (Lazy Loading Mode)")
 
         Catch ex As Exception
             Console.WriteLine($"Error in InitializeExcelCache: {ex.Message}")
@@ -342,49 +326,114 @@ Public Class frmHistory
         End Try
     End Sub
 
-    Private Sub RefreshExcelDataAsync()
+    ''' <summary>
+    ''' ตรวจสอบและโหลดข้อมูล Excel เฉพาะเมื่อต้องการใช้งาน (Lazy Loading)
+    ''' </summary>
+    ''' <returns>True ถ้าข้อมูลพร้อมใช้งาน</returns>
+    Private Async Function EnsureExcelDataLoadedAsync() As Task(Of Boolean)
         Try
-            Console.WriteLine("เริ่มรีเฟรชข้อมูล Excel...")
+            ' ตรวจสอบว่าข้อมูลโหลดแล้วหรือยัง
+            If dataCache.IsLoaded AndAlso
+               dataCache.ExcelFilePath.Equals(excelFilePath, StringComparison.OrdinalIgnoreCase) Then
+                Console.WriteLine("ข้อมูล Excel โหลดแล้ว ไม่ต้องโหลดใหม่")
+                Return True
+            End If
 
-            Dim result = dataCache.RefreshData()
+            Console.WriteLine("เริ่มโหลดข้อมูล Excel แบบ Lazy Loading")
 
-            Me.Invoke(Sub()
-                          Try
-                              If result.IsSuccess Then
-                                  ShowExcelLoadingStatus($"รีเฟรชข้อมูลสำเร็จ: {dataCache.RowCount} แถว")
-                                  EnableExcelSearchControls(True)
-                              Else
-                                  ShowExcelLoadingStatus($"รีเฟรชไม่สำเร็จ: {result.Message}")
-                                  ' ไม่ปิด Controls เพราะยังใช้ข้อมูลเก่าได้
-                              End If
-                          Catch uiEx As Exception
-                              Console.WriteLine($"Error updating UI after Excel refresh: {uiEx.Message}")
-                          End Try
-                      End Sub)
+            ' แสดง Progress Bar
+            ShowProgressBar()
+            ShowExcelLoadingStatus("กำลังโหลดข้อมูล Excel...")
+
+            ' ปิดการใช้งานปุ่มต่างๆ ระหว่างโหลด
+            EnableExcelSearchControls(False)
+
+            ' สร้าง Progress Handler
+            Dim progressHandler As New Progress(Of Object)(
+                Sub(progress)
+                    Try
+                        Me.Invoke(Sub()
+                                      UpdateLoadingProgress(progress)
+                                  End Sub)
+                    Catch ex As Exception
+                        Console.WriteLine($"Progress update error: {ex.Message}")
+                    End Try
+                End Sub)
+
+            ' โหลดข้อมูลใน Background Thread
+            Dim result = Await Task.Run(Function() As LoadResult
+                                            Try
+                                                Return dataCache.LoadExcelDataWithProgress(excelFilePath, progressHandler)
+                                            Catch ex As Exception
+                                                Console.WriteLine($"Error in background loading: {ex.Message}")
+                                                Return New LoadResult() With {
+                                                    .IsSuccess = False,
+                                                    .ErrorMessage = ex.Message
+                                                }
+                                            End Try
+                                        End Function)
+
+            ' ซ่อน Progress Bar
+            HideProgressBar()
+
+            ' ตรวจสอบผลลัพธ์
+            If result.IsSuccess Then
+                ShowSuccessNotification($"โหลดข้อมูล Excel สำเร็จ! ({result.ProcessedRows:N0} แถว)")
+                EnableExcelSearchControls(True)
+
+                Console.WriteLine($"โหลดข้อมูล Excel สำเร็จ: {result.ProcessedRows:N0} แถว")
+                Return True
+            Else
+                ShowExcelLoadingStatus($"❌ โหลดข้อมูลไม่สำเร็จ: {result.ErrorMessage}")
+                EnableExcelSearchControls(False)
+                Console.WriteLine($"โหลดข้อมูล Excel ไม่สำเร็จ: {result.ErrorMessage}")
+                Return False
+            End If
 
         Catch ex As Exception
-            Console.WriteLine($"Error in RefreshExcelDataAsync: {ex.Message}")
-            Me.Invoke(Sub()
-                          ShowExcelLoadingStatus($"รีเฟรชข้อผิดพลาด: {ex.Message}")
-                      End Sub)
+            HideProgressBar()
+            ShowExcelLoadingStatus($"❌ เกิดข้อผิดพลาด: {ex.Message}")
+            EnableExcelSearchControls(False)
+            Console.WriteLine($"Error in EnsureExcelDataLoadedAsync: {ex.Message}")
+            Return False
         End Try
-    End Sub
+    End Function
 
-    Private Sub LoadExcelDataAsync()
+    ''' <summary>
+    ''' โหลดข้อมูล Excel พร้อมแสดง Progress (สำหรับการรีเฟรช)
+    ''' </summary>
+    Private Sub LoadExcelDataAsyncWithProgress()
         Try
-            Console.WriteLine("เริ่มโหลดข้อมูล Excel แบบ Async...")
+            Console.WriteLine("เริ่มโหลดข้อมูล Excel พร้อม Progress...")
 
-            Dim result = dataCache.LoadExcelData(excelFilePath)
+            ' สร้าง Progress Handler
+            Dim progressHandler As New Progress(Of Object)(
+                Sub(progress)
+                    Try
+                        Me.Invoke(Sub()
+                                      UpdateLoadingProgress(progress)
+                                  End Sub)
+                    Catch ex As Exception
+                        Console.WriteLine($"Progress update error: {ex.Message}")
+                    End Try
+                End Sub)
+
+            Dim result = dataCache.LoadExcelDataWithProgress(excelFilePath, progressHandler)
 
             ' อัพเดท UI ใน Main Thread
             Me.Invoke(Sub()
                           Try
+                              HideProgressBar()
+
                               If result.IsSuccess Then
-                                  ShowExcelLoadingStatus($"โหลดข้อมูล Excel สำเร็จ: {dataCache.RowCount} แถว")
+                                  ShowExcelLoadingStatus($"โหลดข้อมูล Excel สำเร็จ: {dataCache.RowCount:N0} แถว (ใช้เวลา {result.LoadTimeSeconds:F1} วินาที)")
                                   EnableExcelSearchControls(True)
 
                                   ' แสดงข้อมูลสถิติ
                                   Console.WriteLine(dataCache.GetMemoryStats())
+
+                                  ' แสดงการแจ้งเตือนสั้นๆ
+                                  ShowSuccessNotification($"โหลดข้อมูล {dataCache.RowCount:N0} แถว สำเร็จ")
                               Else
                                   ShowExcelLoadingStatus($"ไม่สามารถโหลด Excel ได้: {result.Message}")
                                   EnableExcelSearchControls(False)
@@ -401,11 +450,158 @@ Public Class frmHistory
                       End Sub)
 
         Catch ex As Exception
-            Console.WriteLine($"Error in LoadExcelDataAsync: {ex.Message}")
+            Console.WriteLine($"Error in LoadExcelDataAsyncWithProgress: {ex.Message}")
             Me.Invoke(Sub()
+                          HideProgressBar()
                           ShowExcelLoadingStatus($"เกิดข้อผิดพลาด: {ex.Message}")
                           EnableExcelSearchControls(False)
                       End Sub)
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' อัพเดท Progress Bar และข้อความ
+    ''' </summary>
+    Private Sub UpdateLoadingProgress(progress As Object)
+        Try
+            ' ตรวจสอบและแปลง progress object
+            Dim progressMessage As String = ""
+            Dim processedRows As Integer = 0
+            Dim totalRows As Integer = 0
+
+            ' ใช้ Anonymous Type หรือ Dynamic Object
+            Try
+                Dim progressObj = CType(progress, Object)
+                Dim progressType = progressObj.GetType()
+
+                ' ดึงค่าจาก properties
+                Dim messageProperty = progressType.GetProperty("Message")
+                If messageProperty IsNot Nothing Then
+                    Dim messageValue = messageProperty.GetValue(progressObj)
+                    progressMessage = If(messageValue IsNot Nothing, messageValue.ToString(), "")
+                End If
+
+                Dim processedProperty = progressType.GetProperty("ProcessedRows")
+                If processedProperty IsNot Nothing Then
+                    Dim processedValue = processedProperty.GetValue(progressObj)
+                    If processedValue IsNot Nothing Then
+                        Integer.TryParse(processedValue.ToString(), processedRows)
+                    End If
+                End If
+
+                Dim totalProperty = progressType.GetProperty("TotalRows")
+                If totalProperty IsNot Nothing Then
+                    Dim totalValue = totalProperty.GetValue(progressObj)
+                    If totalValue IsNot Nothing Then
+                        Integer.TryParse(totalValue.ToString(), totalRows)
+                    End If
+                End If
+
+            Catch ex As Exception
+                Console.WriteLine($"Error parsing progress object: {ex.Message}")
+                progressMessage = "กำลังโหลดข้อมูล..."
+            End Try
+
+            ' อัพเดท Progress Bar
+            If toolStripProgressBar IsNot Nothing Then
+                If totalRows > 0 Then
+                    toolStripProgressBar.Style = ProgressBarStyle.Continuous
+                    toolStripProgressBar.Maximum = totalRows
+                    toolStripProgressBar.Value = Math.Min(processedRows, totalRows)
+                End If
+            End If
+
+            ' อัพเดทข้อความสถานะ
+            Dim statusMessage = progressMessage
+            If totalRows > 0 Then
+                Dim percentage = (processedRows / totalRows * 100)
+                statusMessage = $"{progressMessage} ({processedRows:N0}/{totalRows:N0} - {percentage:F1}%)"
+            End If
+
+            ShowExcelLoadingStatus(statusMessage)
+
+            ' อัพเดท Application
+            Application.DoEvents()
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in UpdateLoadingProgress: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' แสดง Progress Bar
+    ''' </summary>
+    Private Sub ShowProgressBar()
+        Try
+            If toolStripProgressBar IsNot Nothing Then
+                toolStripProgressBar.Visible = True
+                toolStripProgressBar.Style = ProgressBarStyle.Marquee
+                toolStripProgressBar.Value = 0
+            End If
+        Catch ex As Exception
+            Console.WriteLine($"Error in ShowProgressBar: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' ซ่อน Progress Bar
+    ''' </summary>
+    Private Sub HideProgressBar()
+        Try
+            If toolStripProgressBar IsNot Nothing Then
+                toolStripProgressBar.Visible = False
+                toolStripProgressBar.Value = 0
+            End If
+        Catch ex As Exception
+            Console.WriteLine($"Error in HideProgressBar: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' แสดงการแจ้งเตือนสำเร็จแบบสั้น
+    ''' </summary>
+    Private Sub ShowSuccessNotification(message As String)
+        Try
+            ' สร้าง Timer เพื่อซ่อนข้อความหลังจาก 3 วินาที
+            Dim hideTimer As New System.Windows.Forms.Timer()
+            hideTimer.Interval = 3000
+
+            AddHandler hideTimer.Tick, Sub(sender, e)
+                                           hideTimer.Stop()
+                                           hideTimer.Dispose()
+                                           ShowExcelLoadingStatus("พร้อมใช้งาน")
+                                       End Sub
+
+            ShowExcelLoadingStatus($"✅ {message}")
+            hideTimer.Start()
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in ShowSuccessNotification: {ex.Message}")
+        End Try
+    End Sub
+
+    ''' <summary>
+    ''' เปิด/ปิดการใช้งาน Controls ที่เกี่ยวข้องกับการค้นหา Excel
+    ''' </summary>
+    Private Sub EnableExcelSearchControls(enabled As Boolean)
+        Try
+            ' เปิด/ปิด txtSearch
+            If txtSearch IsNot Nothing Then
+                txtSearch.Enabled = enabled
+                If enabled Then
+                    txtSearch.BackColor = Color.White
+                    txtSearch.PlaceholderText = "พิมพ์รหัสผลิตภัณฑ์และกด Enter..."
+                Else
+                    txtSearch.BackColor = Color.LightGray
+                    txtSearch.PlaceholderText = "รอการโหลดข้อมูล Excel..."
+                End If
+            End If
+
+            ' เปิด/ปิดปุ่มที่เกี่ยวข้อง (ถ้ามี)
+            ' btnExcelSearch?.Enabled = enabled
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in EnableExcelSearchControls: {ex.Message}")
         End Try
     End Sub
 
@@ -973,6 +1169,9 @@ Public Class frmHistory
                                     If canCreateMission Then
                                         .Cells("btnCreateMission").Value = "🚀 สร้าง"
                                         .Cells("btnCreateMission").Style.ForeColor = Color.Blue
+                                    ElseIf Not dataCache.IsLoaded Then
+                                        .Cells("btnCreateMission").Value = "📊 โหลดข้อมูล"
+                                        .Cells("btnCreateMission").Style.ForeColor = Color.DarkBlue
                                     Else
                                         .Cells("btnCreateMission").Value = "⚠️ ไม่พร้อม"
                                         .Cells("btnCreateMission").Style.ForeColor = Color.Orange
@@ -1022,7 +1221,58 @@ Public Class frmHistory
     End Sub
 
     ''' <summary>
-    ''' ตรวจสอบว่าสามารถสร้าง Mission ได้หรือไม่
+    ''' ตรวจสอบว่าสามารถสร้าง Mission ได้หรือไม่ (แบบ Lazy Loading)
+    ''' </summary>
+    ''' <param name="productCode">รหัสผลิตภัณฑ์</param>
+    ''' <returns>True ถ้าสามารถสร้าง Mission ได้</returns>
+    Private Async Function CheckCanCreateMissionAsync(productCode As String) As Task(Of Boolean)
+        Try
+            If String.IsNullOrEmpty(productCode) Then
+                Return False
+            End If
+
+            ' ตรวจสอบการเชื่อมต่อเครือข่าย
+            Dim networkResult As NetworkCheckResult = CheckNetworkConnection()
+            If Not networkResult.IsConnected OrElse networkResult.NetworkType <> "OA" Then
+                Return False
+            End If
+
+            ' ตรวจสอบว่าไฟล์ Excel มีอยู่หรือไม่
+            If Not File.Exists(excelFilePath) Then
+                Return False
+            End If
+
+            ' ตรวจสอบและโหลดข้อมูล Excel ถ้าจำเป็น
+            Dim dataLoaded = Await EnsureExcelDataLoadedAsync()
+            If Not dataLoaded Then
+                Return False
+            End If
+
+            ' ค้นหาข้อมูลใน Cache
+            Dim searchResult = dataCache.SearchInMemory(productCode)
+            If Not searchResult.IsSuccess OrElse Not searchResult.HasMatches Then
+                Return False
+            End If
+
+            ' ตรวจสอบว่าหาไฟล์เจอแบบ 1:1 หรือไม่
+            If searchResult.FirstMatch IsNot Nothing AndAlso Not String.IsNullOrEmpty(searchResult.FirstMatch.Column4Value) Then
+                Dim fileSearchResult = SearchFilesInDirectory(searchResult.FirstMatch.Column4Value)
+                ' ต้องเจอไฟล์พอดี 1 ไฟล์
+                If fileSearchResult.FilesFound.Count = 1 Then
+                    Return True
+                End If
+            End If
+
+            Return False
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in CheckCanCreateMissionAsync: {ex.Message}")
+            Return False
+        End Try
+    End Function
+
+    ''' <summary>
+    ''' ตรวจสอบว่าสามารถสร้าง Mission ได้หรือไม่ (เวอร์ชัน Synchronous สำหรับ UI)
     ''' </summary>
     ''' <param name="productCode">รหัสผลิตภัณฑ์</param>
     ''' <returns>True ถ้าสามารถสร้าง Mission ได้</returns>
@@ -1038,25 +1288,28 @@ Public Class frmHistory
                 Return False
             End If
 
-            ' ตรวจสอบว่าพบข้อมูลใน Excel หรือไม่
-            Dim excelPath As String = "\\10.24.179.2\OAFAB\OA2FAB\Film charecter check\Database.xlsx"
-            If Not File.Exists(excelPath) Then
+            ' ตรวจสอบว่าไฟล์ Excel มีอยู่หรือไม่
+            If Not File.Exists(excelFilePath) Then
                 Return False
             End If
 
-            ' ค้นหาข้อมูลใน Excel
-            Dim searchResult As ExcelUtility.ExcelSearchResult = ExcelUtility.SearchProductInExcel(excelPath, productCode)
-            If Not searchResult.IsSuccess OrElse Not searchResult.HasMatches Then
-                Return False
-            End If
-
-            ' ตรวจสอบว่าหาไฟล์เจอแบบ 1:1 หรือไม่
-            If searchResult.FirstMatch IsNot Nothing AndAlso Not String.IsNullOrEmpty(searchResult.FirstMatch.Column4Value) Then
-                Dim fileSearchResult = SearchFilesInDirectory(searchResult.FirstMatch.Column4Value)
-                ' ต้องเจอไฟล์พอดี 1 ไฟล์
-                If fileSearchResult.FilesFound.Count = 1 Then
-                    Return True
+            ' ถ้าข้อมูลโหลดแล้ว ใช้ Cache
+            If dataCache.IsLoaded Then
+                Dim searchResult = dataCache.SearchInMemory(productCode)
+                If Not searchResult.IsSuccess OrElse Not searchResult.HasMatches Then
+                    Return False
                 End If
+
+                ' ตรวจสอบว่าหาไฟล์เจอแบบ 1:1 หรือไม่
+                If searchResult.FirstMatch IsNot Nothing AndAlso Not String.IsNullOrEmpty(searchResult.FirstMatch.Column4Value) Then
+                    Dim fileSearchResult = SearchFilesInDirectory(searchResult.FirstMatch.Column4Value)
+                    If fileSearchResult.FilesFound.Count = 1 Then
+                        Return True
+                    End If
+                End If
+            Else
+                ' ถ้าข้อมูลยังไม่โหลด ให้ส่งคืน False และจะโหลดเมื่อผู้ใช้กดปุ่ม
+                Return False
             End If
 
             Return False
@@ -1122,7 +1375,7 @@ Public Class frmHistory
     ''' <summary>
     ''' จัดการการคลิกปุ่ม Mission
     ''' </summary>
-    Private Sub HandleMissionButton(rowIndex As Integer)
+    Private Async Sub HandleMissionButton(rowIndex As Integer)
         Try
             If rowIndex < 0 OrElse rowIndex >= dgvHistory.Rows.Count Then
                 Return
@@ -1141,7 +1394,7 @@ Public Class frmHistory
                     End If
 
                     ' ตรวจสอบว่าสามารถสร้าง Mission ได้หรือไม่
-                    Dim canCreateResult As MissionCreationCheck = CheckMissionCreationRequirements(record.ProductCode)
+                    Dim canCreateResult As MissionCreationCheck = Await CheckMissionCreationRequirementsAsync(record.ProductCode)
                     If Not canCreateResult.CanCreate Then
                         MessageBox.Show($"ไม่สามารถสร้าง Mission ได้{vbCrLf}{vbCrLf}เหตุผล: {canCreateResult.Reason}",
                                        "ไม่สามารถสร้าง Mission", MessageBoxButtons.OK, MessageBoxIcon.Warning)
@@ -1175,11 +1428,11 @@ Public Class frmHistory
     End Sub
 
     ''' <summary>
-    ''' ตรวจสอบข้อกำหนดในการสร้าง Mission อย่างละเอียด
+    ''' ตรวจสอบข้อกำหนดในการสร้าง Mission อย่างละเอียด (แบบ Lazy Loading)
     ''' </summary>
     ''' <param name="productCode">รหัสผลิตภัณฑ์</param>
     ''' <returns>ผลการตรวจสอบพร้อมเหตุผล</returns>
-    Private Function CheckMissionCreationRequirements(productCode As String) As MissionCreationCheck
+    Private Async Function CheckMissionCreationRequirementsAsync(productCode As String) As Task(Of MissionCreationCheck)
         Dim result As New MissionCreationCheck()
 
         Try
@@ -1205,15 +1458,22 @@ Public Class frmHistory
             End If
 
             ' ตรวจสอบไฟล์ Excel
-            Dim excelPath As String = "\\10.24.179.2\OAFAB\OA2FAB\Film charecter check\Database.xlsx"
-            If Not File.Exists(excelPath) Then
+            If Not File.Exists(excelFilePath) Then
                 result.CanCreate = False
                 result.Reason = "ไม่พบไฟล์ Excel Database"
                 Return result
             End If
 
-            ' ค้นหาข้อมูลใน Excel
-            Dim searchResult As ExcelUtility.ExcelSearchResult = ExcelUtility.SearchProductInExcel(excelPath, productCode)
+            ' ตรวจสอบและโหลดข้อมูล Excel ถ้าจำเป็น
+            Dim dataLoaded = Await EnsureExcelDataLoadedAsync()
+            If Not dataLoaded Then
+                result.CanCreate = False
+                result.Reason = "ไม่สามารถโหลดข้อมูล Excel ได้"
+                Return result
+            End If
+
+            ' ค้นหาข้อมูลใน Cache
+            Dim searchResult = dataCache.SearchInMemory(productCode)
             If Not searchResult.IsSuccess Then
                 result.CanCreate = False
                 result.Reason = $"เกิดข้อผิดพลาดในการค้นหา Excel{vbCrLf}{searchResult.ErrorMessage}"
@@ -1365,32 +1625,7 @@ Public Class frmHistory
         End Try
     End Sub
 
-    Private Sub EnableExcelSearchControls(enabled As Boolean)
-        Try
-            ' เปิด/ปิด TextBox สำหรับค้นหา
-            If txtSearch IsNot Nothing Then
-                txtSearch.Enabled = enabled
-            End If
 
-            ' เปิด/ปิดปุ่มค้นหา (ถ้ามี)
-            For Each ctrl As Control In Me.Controls
-                If TypeOf ctrl Is Button Then
-                    Dim btn As Button = DirectCast(ctrl, Button)
-                    If btn.Text.Contains("ค้นหา") OrElse btn.Text.Contains("Search") Then
-                        btn.Enabled = enabled
-                    End If
-                End If
-            Next
-
-            ' เปิด/ปิดปุ่ม Refresh ให้เปิดได้เสมอ
-            If btnRefresh IsNot Nothing Then
-                btnRefresh.Enabled = True ' เปิดเสมอเพื่อให้รีเฟรชได้
-            End If
-
-        Catch ex As Exception
-            Console.WriteLine($"Error in EnableExcelSearchControls: {ex.Message}")
-        End Try
-    End Sub
 
     Private Function SearchInExcelCache(productCode As String) As ExcelUtility.ExcelSearchResult
         Try
@@ -2198,114 +2433,177 @@ Public Class frmHistory
                 Return False
             End If
 
-            ' แสดงกล่องโต้ตอบสำหรับการสร้าง Mission
+            ' แสดงกล่องโต้ตอบสำหรับการสร้าง Mission ที่ปรับปรุงแล้ว
             Dim missionForm As New Form()
             missionForm.Text = "สร้าง Mission ใหม่"
-            missionForm.Size = New Size(600, 500)
+            missionForm.Size = New Size(700, 600)
             missionForm.StartPosition = FormStartPosition.CenterParent
             missionForm.FormBorderStyle = FormBorderStyle.FixedDialog
             missionForm.MaximizeBox = False
             missionForm.MinimizeBox = False
+            missionForm.BackColor = Color.WhiteSmoke
+            missionForm.Font = New Font("Segoe UI", 9)
 
-            ' เพิ่มข้อมูลเพิ่มเติมจากการตรวจสอบ
+            ' Header Panel
+            Dim headerPanel As New Panel()
+            headerPanel.Size = New Size(680, 80)
+            headerPanel.Location = New Point(10, 10)
+            headerPanel.BackColor = Color.FromArgb(52, 152, 219)
+            headerPanel.BorderStyle = BorderStyle.None
+
             Dim lblTitle As New Label()
             lblTitle.Text = "🚀 สร้าง Mission สำหรับข้อมูลที่สแกน"
-            lblTitle.Font = New Font("Segoe UI", 12, FontStyle.Bold)
-            lblTitle.Location = New Point(20, 20)
+            lblTitle.Font = New Font("Segoe UI", 14, FontStyle.Bold)
+            lblTitle.Location = New Point(20, 15)
             lblTitle.AutoSize = True
-            lblTitle.ForeColor = Color.DarkBlue
+            lblTitle.ForeColor = Color.White
+            lblTitle.BackColor = Color.Transparent
+
+            Dim lblSubtitle As New Label()
+            lblSubtitle.Text = "กรุณาตรวจสอบข้อมูลและกรอกรายละเอียดเพิ่มเติม"
+            lblSubtitle.Font = New Font("Segoe UI", 10)
+            lblSubtitle.Location = New Point(20, 45)
+            lblSubtitle.AutoSize = True
+            lblSubtitle.ForeColor = Color.White
+            lblSubtitle.BackColor = Color.Transparent
+
+            headerPanel.Controls.AddRange({lblTitle, lblSubtitle})
+
+            ' Info Panel
+            Dim infoPanel As New Panel()
+            infoPanel.Size = New Size(680, 120)
+            infoPanel.Location = New Point(10, 100)
+            infoPanel.BackColor = Color.White
+            infoPanel.BorderStyle = BorderStyle.FixedSingle
 
             Dim lblProductCode As New Label()
-            lblProductCode.Text = $"รหัสผลิตภัณฑ์: {record.ProductCode}"
-            lblProductCode.Location = New Point(20, 60)
+            lblProductCode.Text = $"📦 รหัสผลิตภัณฑ์: {record.ProductCode}"
+            lblProductCode.Location = New Point(15, 15)
             lblProductCode.AutoSize = True
+            lblProductCode.Font = New Font("Segoe UI", 10, FontStyle.Bold)
+            lblProductCode.ForeColor = Color.FromArgb(52, 73, 94)
 
             Dim lblExcelInfo As New Label()
-            lblExcelInfo.Text = $"ข้อมูลจาก Excel: {creationCheck.ExcelMatch.Column4Value}"
-            lblExcelInfo.Location = New Point(20, 85)
+            lblExcelInfo.Text = $"📊 ข้อมูลจาก Excel: {creationCheck.ExcelMatch.Column4Value}"
+            lblExcelInfo.Location = New Point(15, 40)
             lblExcelInfo.AutoSize = True
-            lblExcelInfo.ForeColor = Color.Green
+            lblExcelInfo.ForeColor = Color.FromArgb(39, 174, 96)
+            lblExcelInfo.Font = New Font("Segoe UI", 9)
 
             Dim lblFileInfo As New Label()
-            lblFileInfo.Text = $"ไฟล์ที่เกี่ยวข้อง: {creationCheck.FoundFile.FileName}"
-            lblFileInfo.Location = New Point(20, 110)
+            lblFileInfo.Text = $"📁 ไฟล์ที่เกี่ยวข้อง: {creationCheck.FoundFile.FileName}"
+            lblFileInfo.Location = New Point(15, 65)
             lblFileInfo.AutoSize = True
-            lblFileInfo.ForeColor = Color.Blue
+            lblFileInfo.ForeColor = Color.FromArgb(41, 128, 185)
+            lblFileInfo.Font = New Font("Segoe UI", 9)
+
+            ' ปุ่มดูไฟล์ในส่วนข้อมูล
+            Dim btnPreviewFile As New Button()
+            btnPreviewFile.Text = "👁️ ดูไฟล์"
+            btnPreviewFile.Location = New Point(580, 62)
+            btnPreviewFile.Size = New Size(90, 28)
+            btnPreviewFile.BackColor = Color.FromArgb(52, 152, 219)
+            btnPreviewFile.ForeColor = Color.White
+            btnPreviewFile.FlatStyle = FlatStyle.Flat
+            btnPreviewFile.FlatAppearance.BorderSize = 0
+            btnPreviewFile.Font = New Font("Segoe UI", 9, FontStyle.Bold)
+            AddHandler btnPreviewFile.Click, Sub()
+                                                 OpenFileWithErrorHandling(creationCheck.FoundFile.FullPath)
+                                             End Sub
+
+            infoPanel.Controls.AddRange({lblProductCode, lblExcelInfo, lblFileInfo, btnPreviewFile})
+
+            ' Form Panel
+            Dim formPanel As New Panel()
+            formPanel.Size = New Size(680, 280)
+            formPanel.Location = New Point(10, 230)
+            formPanel.BackColor = Color.White
+            formPanel.BorderStyle = BorderStyle.FixedSingle
 
             Dim lblMissionName As New Label()
-            lblMissionName.Text = "ชื่อ Mission:"
-            lblMissionName.Location = New Point(20, 145)
+            lblMissionName.Text = "📝 ชื่อ Mission:"
+            lblMissionName.Location = New Point(15, 15)
             lblMissionName.AutoSize = True
+            lblMissionName.Font = New Font("Segoe UI", 10, FontStyle.Bold)
+            lblMissionName.ForeColor = Color.FromArgb(52, 73, 94)
 
             Dim txtMissionName As New TextBox()
             txtMissionName.Text = $"ตรวจสอบ {record.ProductCode} - {creationCheck.ExcelMatch.Column4Value}"
-            txtMissionName.Location = New Point(20, 165)
-            txtMissionName.Size = New Size(540, 23)
+            txtMissionName.Location = New Point(15, 40)
+            txtMissionName.Size = New Size(650, 25)
+            txtMissionName.Font = New Font("Segoe UI", 9)
+            txtMissionName.BorderStyle = BorderStyle.FixedSingle
 
             Dim lblDescription As New Label()
-            lblDescription.Text = "รายละเอียด Mission:"
-            lblDescription.Location = New Point(20, 200)
+            lblDescription.Text = "📋 รายละเอียด Mission:"
+            lblDescription.Location = New Point(15, 75)
             lblDescription.AutoSize = True
+            lblDescription.Font = New Font("Segoe UI", 10, FontStyle.Bold)
+            lblDescription.ForeColor = Color.FromArgb(52, 73, 94)
 
             Dim txtDescription As New TextBox()
             txtDescription.Multiline = True
             txtDescription.Text = $"ตรวจสอบและดำเนินการกับข้อมูล QR Code{vbCrLf}" &
-                             $"รหัสผลิตภัณฑ์: {record.ProductCode}{vbCrLf}" &
-                             $"รหัสอ้างอิง: {record.ReferenceCode}{vbCrLf}" &
-                             $"จำนวน: {record.Quantity}{vbCrLf}" &
-                             $"วันที่ผลิต: {record.DateCode}{vbCrLf}" &
-                             $"ข้อมูล Excel: {creationCheck.ExcelMatch.Column4Value}{vbCrLf}" &
-                             $"ไฟล์เกี่ยวข้อง: {creationCheck.FoundFile.FileName}"
-            txtDescription.Location = New Point(20, 220)
-            txtDescription.Size = New Size(540, 120)
+                             $"• รหัสผลิตภัณฑ์: {record.ProductCode}{vbCrLf}" &
+                             $"• รหัสอ้างอิง: {record.ReferenceCode}{vbCrLf}" &
+                             $"• จำนวน: {record.Quantity}{vbCrLf}" &
+                             $"• วันที่ผลิต: {record.DateCode}{vbCrLf}" &
+                             $"• ข้อมูล Excel: {creationCheck.ExcelMatch.Column4Value}{vbCrLf}" &
+                             $"• ไฟล์เกี่ยวข้อง: {creationCheck.FoundFile.FileName}"
+            txtDescription.Location = New Point(15, 100)
+            txtDescription.Size = New Size(650, 120)
             txtDescription.ScrollBars = ScrollBars.Vertical
+            txtDescription.Font = New Font("Segoe UI", 9)
+            txtDescription.BorderStyle = BorderStyle.FixedSingle
 
             Dim lblAssignedTo As New Label()
-            lblAssignedTo.Text = "ผู้รับผิดชอบ:"
-            lblAssignedTo.Location = New Point(20, 355)
+            lblAssignedTo.Text = "👤 ผู้รับผิดชอบ:"
+            lblAssignedTo.Location = New Point(15, 235)
             lblAssignedTo.AutoSize = True
+            lblAssignedTo.Font = New Font("Segoe UI", 10, FontStyle.Bold)
+            lblAssignedTo.ForeColor = Color.FromArgb(52, 73, 94)
 
             Dim txtAssignedTo As New TextBox()
             txtAssignedTo.Text = record.UserName
-            txtAssignedTo.Location = New Point(120, 352)
-            txtAssignedTo.Size = New Size(200, 23)
+            txtAssignedTo.Location = New Point(140, 232)
+            txtAssignedTo.Size = New Size(200, 25)
+            txtAssignedTo.Font = New Font("Segoe UI", 9)
+            txtAssignedTo.BorderStyle = BorderStyle.FixedSingle
 
-            ' ปุ่มดูไฟล์
-            Dim btnViewFile As New Button()
-            btnViewFile.Text = "📁 ดูไฟล์"
-            btnViewFile.Location = New Point(340, 352)
-            btnViewFile.Size = New Size(80, 23)
-            btnViewFile.BackColor = Color.LightBlue
-            btnViewFile.FlatStyle = FlatStyle.Flat
-            AddHandler btnViewFile.Click, Sub()
-                                              OpenFileWithErrorHandling(creationCheck.FoundFile.FullPath)
-                                          End Sub
+            formPanel.Controls.AddRange({lblMissionName, txtMissionName, lblDescription, txtDescription, lblAssignedTo, txtAssignedTo})
 
-            ' ปุ่มยืนยัน
+            ' Button Panel
+            Dim buttonPanel As New Panel()
+            buttonPanel.Size = New Size(680, 60)
+            buttonPanel.Location = New Point(10, 520)
+            buttonPanel.BackColor = Color.WhiteSmoke
+
             Dim btnConfirm As New Button()
             btnConfirm.Text = "✅ สร้าง Mission"
-            btnConfirm.Location = New Point(430, 390)
-            btnConfirm.Size = New Size(120, 30)
-            btnConfirm.BackColor = Color.Green
+            btnConfirm.Location = New Point(480, 15)
+            btnConfirm.Size = New Size(140, 35)
+            btnConfirm.BackColor = Color.FromArgb(39, 174, 96)
             btnConfirm.ForeColor = Color.White
             btnConfirm.FlatStyle = FlatStyle.Flat
-            btnConfirm.Font = New Font("Segoe UI", 9, FontStyle.Bold)
+            btnConfirm.FlatAppearance.BorderSize = 0
+            btnConfirm.Font = New Font("Segoe UI", 10, FontStyle.Bold)
             btnConfirm.DialogResult = DialogResult.OK
 
-            ' ปุ่มยกเลิก
             Dim btnCancel As New Button()
             btnCancel.Text = "❌ ยกเลิก"
-            btnCancel.Location = New Point(560, 390)
-            btnCancel.Size = New Size(80, 30)
-            btnCancel.BackColor = Color.Gray
+            btnCancel.Location = New Point(630, 15)
+            btnCancel.Size = New Size(90, 35)
+            btnCancel.BackColor = Color.FromArgb(231, 76, 60)
             btnCancel.ForeColor = Color.White
             btnCancel.FlatStyle = FlatStyle.Flat
+            btnCancel.FlatAppearance.BorderSize = 0
+            btnCancel.Font = New Font("Segoe UI", 10, FontStyle.Bold)
             btnCancel.DialogResult = DialogResult.Cancel
 
-            ' เพิ่ม Controls เข้าฟอร์ม
-            missionForm.Controls.AddRange({lblTitle, lblProductCode, lblExcelInfo, lblFileInfo, lblMissionName, txtMissionName,
-                                      lblDescription, txtDescription, lblAssignedTo, txtAssignedTo, btnViewFile,
-                                      btnConfirm, btnCancel})
+            buttonPanel.Controls.AddRange({btnConfirm, btnCancel})
+
+            ' เพิ่ม Panels เข้าฟอร์ม
+            missionForm.Controls.AddRange({headerPanel, infoPanel, formPanel, buttonPanel})
 
             ' แสดงฟอร์ม
             If missionForm.ShowDialog() = DialogResult.OK Then
@@ -2401,78 +2699,193 @@ Public Class frmHistory
                 Return ""
             End If
 
-            ' สร้างฟอร์มแสดงสถานะ Mission
+            ' สร้างฟอร์มแสดงสถานะ Mission ที่ปรับปรุงแล้ว
             Dim statusForm As New Form()
             statusForm.Text = "ตรวจสอบสถานะ Mission"
-            statusForm.Size = New Size(600, 500)
+            statusForm.Size = New Size(750, 600)
             statusForm.StartPosition = FormStartPosition.CenterParent
             statusForm.FormBorderStyle = FormBorderStyle.FixedDialog
             statusForm.MaximizeBox = False
             statusForm.MinimizeBox = False
+            statusForm.BackColor = Color.WhiteSmoke
+            statusForm.Font = New Font("Segoe UI", 9)
 
-            ' สร้าง GroupBox สำหรับข้อมูล Mission
-            Dim grpMissionInfo As New GroupBox()
-            grpMissionInfo.Text = "ข้อมูล Mission"
-            grpMissionInfo.Location = New Point(20, 20)
-            grpMissionInfo.Size = New Size(540, 200)
+            ' Header Panel
+            Dim headerPanel As New Panel()
+            headerPanel.Size = New Size(730, 70)
+            headerPanel.Location = New Point(10, 10)
+            headerPanel.BackColor = Color.FromArgb(155, 89, 182)
+            headerPanel.BorderStyle = BorderStyle.None
+
+            Dim lblTitle As New Label()
+            lblTitle.Text = "📋 ตรวจสอบสถานะ Mission"
+            lblTitle.Font = New Font("Segoe UI", 14, FontStyle.Bold)
+            lblTitle.Location = New Point(20, 15)
+            lblTitle.AutoSize = True
+            lblTitle.ForeColor = Color.White
+            lblTitle.BackColor = Color.Transparent
+
+            Dim lblStatus As New Label()
+            lblStatus.Text = $"สถานะปัจจุบัน: {record.MissionStatus}"
+            lblStatus.Font = New Font("Segoe UI", 11, FontStyle.Bold)
+            lblStatus.Location = New Point(20, 40)
+            lblStatus.AutoSize = True
+            lblStatus.ForeColor = Color.White
+            lblStatus.BackColor = Color.Transparent
+
+            headerPanel.Controls.AddRange({lblTitle, lblStatus})
+
+            ' Info Panel
+            Dim infoPanel As New Panel()
+            infoPanel.Size = New Size(730, 180)
+            infoPanel.Location = New Point(10, 90)
+            infoPanel.BackColor = Color.White
+            infoPanel.BorderStyle = BorderStyle.FixedSingle
 
             Dim lblInfo As New Label()
-            lblInfo.Text = $"📋 สถานะ Mission: {record.MissionStatus}{vbCrLf}{vbCrLf}" &
-                          $"🔍 รหัสผลิตภัณฑ์: {record.ProductCode}{vbCrLf}" &
+            lblInfo.Text = $"🔍 รหัสผลิตภัณฑ์: {record.ProductCode}{vbCrLf}" &
                           $"📅 วันที่สแกน: {record.ScanDateTime:yyyy-MM-dd HH:mm:ss}{vbCrLf}" &
+                          $"📋 รหัสอ้างอิง: {record.ReferenceCode}{vbCrLf}" &
+                          $"🔢 จำนวน: {record.Quantity}{vbCrLf}" &
+                          $"📅 วันที่ผลิต: {record.DateCode}{vbCrLf}" &
                           $"👤 ผู้ใช้: {record.UserName}{vbCrLf}" &
                           $"💻 เครื่อง: {record.ComputerName}{vbCrLf}" &
                           $"✅ สถานะข้อมูล: {If(record.IsValid, "ถูกต้อง", "ไม่ถูกต้อง")}"
-            lblInfo.Location = New Point(15, 25)
-            lblInfo.Size = New Size(510, 160)
+            lblInfo.Location = New Point(15, 15)
+            lblInfo.Size = New Size(700, 150)
             lblInfo.Font = New Font("Segoe UI", 10)
-            grpMissionInfo.Controls.Add(lblInfo)
+            lblInfo.ForeColor = Color.FromArgb(52, 73, 94)
 
-            ' สร้าง GroupBox สำหรับการดำเนินการ
-            Dim grpActions As New GroupBox()
-            grpActions.Text = "การดำเนินการ"
-            grpActions.Location = New Point(20, 240)
-            grpActions.Size = New Size(540, 150)
+            infoPanel.Controls.Add(lblInfo)
+
+            ' File Panel (สำหรับแสดงไฟล์ที่เกี่ยวข้อง)
+            Dim filePanel As New Panel()
+            filePanel.Size = New Size(730, 120)
+            filePanel.Location = New Point(10, 280)
+            filePanel.BackColor = Color.FromArgb(236, 240, 241)
+            filePanel.BorderStyle = BorderStyle.FixedSingle
+
+            Dim lblFileTitle As New Label()
+            lblFileTitle.Text = "📁 ไฟล์ที่เกี่ยวข้อง"
+            lblFileTitle.Font = New Font("Segoe UI", 11, FontStyle.Bold)
+            lblFileTitle.Location = New Point(15, 15)
+            lblFileTitle.AutoSize = True
+            lblFileTitle.ForeColor = Color.FromArgb(52, 73, 94)
+
+            ' ค้นหาไฟล์ที่เกี่ยวข้องกับ Mission นี้
+            Dim missionFiles = FindMissionFiles(record)
+            Dim fileListText As String = ""
+
+            If missionFiles.Count > 0 Then
+                For Each file In missionFiles
+                    fileListText += $"• {file.Name} ({file.Length:N0} bytes){vbCrLf}"
+                Next
+            Else
+                fileListText = "ไม่พบไฟล์ที่เกี่ยวข้อง"
+            End If
+
+            Dim lblFileList As New Label()
+            lblFileList.Text = fileListText
+            lblFileList.Location = New Point(15, 45)
+            lblFileList.Size = New Size(500, 60)
+            lblFileList.Font = New Font("Segoe UI", 9)
+            lblFileList.ForeColor = Color.FromArgb(52, 73, 94)
+
+            ' ปุ่มเปิดไฟล์
+            Dim btnOpenFile As New Button()
+            btnOpenFile.Text = "📂 เปิดไฟล์"
+            btnOpenFile.Location = New Point(550, 45)
+            btnOpenFile.Size = New Size(100, 30)
+            btnOpenFile.BackColor = Color.FromArgb(52, 152, 219)
+            btnOpenFile.ForeColor = Color.White
+            btnOpenFile.FlatStyle = FlatStyle.Flat
+            btnOpenFile.FlatAppearance.BorderSize = 0
+            btnOpenFile.Font = New Font("Segoe UI", 9, FontStyle.Bold)
+            btnOpenFile.Enabled = missionFiles.Count > 0
+
+            AddHandler btnOpenFile.Click, Sub()
+                                              If missionFiles.Count > 0 Then
+                                                  OpenFileWithErrorHandling(missionFiles(0).FullName)
+                                              End If
+                                          End Sub
+
+            ' ปุ่มเปิดโฟลเดอร์
+            Dim btnOpenFolder As New Button()
+            btnOpenFolder.Text = "📁 เปิดโฟลเดอร์"
+            btnOpenFolder.Location = New Point(660, 45)
+            btnOpenFolder.Size = New Size(100, 30)
+            btnOpenFolder.BackColor = Color.FromArgb(46, 204, 113)
+            btnOpenFolder.ForeColor = Color.White
+            btnOpenFolder.FlatStyle = FlatStyle.Flat
+            btnOpenFolder.FlatAppearance.BorderSize = 0
+            btnOpenFolder.Font = New Font("Segoe UI", 9, FontStyle.Bold)
+
+            AddHandler btnOpenFolder.Click, Sub()
+                                                OpenMissionFolder(record)
+                                            End Sub
+
+            filePanel.Controls.AddRange({lblFileTitle, lblFileList, btnOpenFile, btnOpenFolder})
+
+            ' Action Panel
+            Dim actionPanel As New Panel()
+            actionPanel.Size = New Size(730, 120)
+            actionPanel.Location = New Point(10, 410)
+            actionPanel.BackColor = Color.White
+            actionPanel.BorderStyle = BorderStyle.FixedSingle
+
+            Dim lblActionTitle As New Label()
+            lblActionTitle.Text = "⚡ การดำเนินการ"
+            lblActionTitle.Font = New Font("Segoe UI", 11, FontStyle.Bold)
+            lblActionTitle.Location = New Point(15, 15)
+            lblActionTitle.AutoSize = True
+            lblActionTitle.ForeColor = Color.FromArgb(52, 73, 94)
 
             ' ปุ่มเปลี่ยนสถานะเป็น "สำเร็จ"
             Dim btnMarkComplete As New Button()
             btnMarkComplete.Text = "✅ ทำเครื่องหมายว่าสำเร็จ"
-            btnMarkComplete.Location = New Point(20, 30)
-            btnMarkComplete.Size = New Size(200, 35)
-            btnMarkComplete.BackColor = Color.Green
+            btnMarkComplete.Location = New Point(15, 50)
+            btnMarkComplete.Size = New Size(180, 35)
+            btnMarkComplete.BackColor = Color.FromArgb(39, 174, 96)
             btnMarkComplete.ForeColor = Color.White
             btnMarkComplete.FlatStyle = FlatStyle.Flat
+            btnMarkComplete.FlatAppearance.BorderSize = 0
             btnMarkComplete.Font = New Font("Segoe UI", 9, FontStyle.Bold)
 
             ' ปุ่มรีเซ็ตสถานะ
             Dim btnReset As New Button()
             btnReset.Text = "🔄 รีเซ็ตสถานะ"
-            btnReset.Location = New Point(240, 30)
-            btnReset.Size = New Size(150, 35)
-            btnReset.BackColor = Color.Orange
+            btnReset.Location = New Point(210, 50)
+            btnReset.Size = New Size(130, 35)
+            btnReset.BackColor = Color.FromArgb(230, 126, 34)
             btnReset.ForeColor = Color.White
             btnReset.FlatStyle = FlatStyle.Flat
+            btnReset.FlatAppearance.BorderSize = 0
+            btnReset.Font = New Font("Segoe UI", 9, FontStyle.Bold)
 
             ' ปุ่มดูรายละเอียด Mission
             Dim btnViewDetails As New Button()
             btnViewDetails.Text = "📄 ดูรายละเอียด"
-            btnViewDetails.Location = New Point(20, 80)
-            btnViewDetails.Size = New Size(150, 35)
-            btnViewDetails.BackColor = Color.Blue
+            btnViewDetails.Location = New Point(355, 50)
+            btnViewDetails.Size = New Size(130, 35)
+            btnViewDetails.BackColor = Color.FromArgb(52, 152, 219)
             btnViewDetails.ForeColor = Color.White
             btnViewDetails.FlatStyle = FlatStyle.Flat
+            btnViewDetails.FlatAppearance.BorderSize = 0
+            btnViewDetails.Font = New Font("Segoe UI", 9, FontStyle.Bold)
 
             ' ปุ่มปิด
             Dim btnClose As New Button()
             btnClose.Text = "❌ ปิด"
-            btnClose.Location = New Point(490, 80)
+            btnClose.Location = New Point(650, 50)
             btnClose.Size = New Size(70, 35)
-            btnClose.BackColor = Color.Gray
+            btnClose.BackColor = Color.FromArgb(149, 165, 166)
             btnClose.ForeColor = Color.White
             btnClose.FlatStyle = FlatStyle.Flat
+            btnClose.FlatAppearance.BorderSize = 0
+            btnClose.Font = New Font("Segoe UI", 9, FontStyle.Bold)
             btnClose.DialogResult = DialogResult.Cancel
 
-            grpActions.Controls.AddRange({btnMarkComplete, btnReset, btnViewDetails, btnClose})
+            actionPanel.Controls.AddRange({lblActionTitle, btnMarkComplete, btnReset, btnViewDetails, btnClose})
 
             ' Event Handlers
             AddHandler btnMarkComplete.Click, Sub()
@@ -2513,8 +2926,8 @@ Public Class frmHistory
                                                  ShowMissionDetailsDialog(record)
                                              End Sub
 
-            ' เพิ่ม Controls เข้าฟอร์ม
-            statusForm.Controls.AddRange({grpMissionInfo, grpActions})
+            ' เพิ่ม Panels เข้าฟอร์ม
+            statusForm.Controls.AddRange({headerPanel, infoPanel, filePanel, actionPanel})
 
             ' แสดงฟอร์ม
             statusForm.ShowDialog()
@@ -2528,6 +2941,75 @@ Public Class frmHistory
             Return ""
         End Try
     End Function
+
+    ''' <summary>
+    ''' ค้นหาไฟล์ที่เกี่ยวข้องกับ Mission
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกน</param>
+    ''' <returns>รายการไฟล์ที่เกี่ยวข้อง</returns>
+    Private Function FindMissionFiles(record As ScanDataRecord) As List(Of FileInfo)
+        Dim files As New List(Of FileInfo)()
+
+        Try
+            ' ค้นหาไฟล์ Mission
+            Dim missionDir As String = Path.Combine(Application.StartupPath, "Missions")
+            If Directory.Exists(missionDir) Then
+                Dim missionPattern As String = $"MISSION_*_{record.Id}.txt"
+                Dim missionFiles = Directory.GetFiles(missionDir, missionPattern)
+
+                For Each file In missionFiles
+                    files.Add(New FileInfo(file))
+                Next
+            End If
+
+            ' ค้นหาไฟล์ที่เกี่ยวข้องจาก Excel (ถ้ามี)
+            Try
+                If dataCache.IsLoaded Then
+                    Dim searchResult = dataCache.SearchInMemory(record.ProductCode)
+                    If searchResult.IsSuccess AndAlso searchResult.HasMatches Then
+                        Dim relatedFileName = searchResult.FirstMatch.Column4Value
+                        If Not String.IsNullOrEmpty(relatedFileName) Then
+                            Dim fileSearchResult = SearchFilesInDirectory(relatedFileName)
+                            For Each foundFile In fileSearchResult.FilesFound
+                                files.Add(New FileInfo(foundFile.FullPath))
+                            Next
+                        End If
+                    End If
+                End If
+            Catch ex As Exception
+                Console.WriteLine($"Error finding related files: {ex.Message}")
+            End Try
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in FindMissionFiles: {ex.Message}")
+        End Try
+
+        Return files
+    End Function
+
+    ''' <summary>
+    ''' เปิดโฟลเดอร์ Mission
+    ''' </summary>
+    ''' <param name="record">ข้อมูลการสแกน</param>
+    Private Sub OpenMissionFolder(record As ScanDataRecord)
+        Try
+            Dim missionDir As String = Path.Combine(Application.StartupPath, "Missions")
+
+            If Directory.Exists(missionDir) Then
+                Process.Start("explorer.exe", missionDir)
+            Else
+                MessageBox.Show("ไม่พบโฟลเดอร์ Mission", "แจ้งเตือน",
+                              MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            End If
+
+        Catch ex As Exception
+            MessageBox.Show($"ไม่สามารถเปิดโฟลเดอร์ได้: {ex.Message}", "ข้อผิดพลาด",
+                          MessageBoxButtons.OK, MessageBoxIcon.Error)
+            Console.WriteLine($"Error in OpenMissionFolder: {ex.Message}")
+        End Try
+    End Sub
+
+
 
     ''' <summary>
     ''' แสดงรายละเอียด Mission ที่เสร็จสิ้นแล้ว
@@ -3023,5 +3505,45 @@ Public Class frmHistory
             Console.WriteLine($"Error reading assembly version in frmHistory: {ex.Message}")
         End Try
     End Sub
+
+
+
+#Region "Additional Helper Methods"
+
+    ''' <summary>
+    ''' รีเฟรชข้อมูล Excel เบื้องหลัง
+    ''' </summary>
+    Private Sub RefreshExcelDataAsync()
+        Try
+            Console.WriteLine("เริ่มรีเฟรชข้อมูล Excel...")
+
+            Dim result = dataCache.RefreshData()
+
+            Me.Invoke(Sub()
+                          Try
+                              If result.IsSuccess Then
+                                  ShowExcelLoadingStatus($"รีเฟรชข้อมูลสำเร็จ: {dataCache.RowCount:N0} แถว")
+                                  EnableExcelSearchControls(True)
+
+                                  ' แสดงการแจ้งเตือนสั้นๆ
+                                  ShowSuccessNotification($"รีเฟรชข้อมูล {dataCache.RowCount:N0} แถว สำเร็จ")
+                              Else
+                                  ShowExcelLoadingStatus($"รีเฟรชไม่สำเร็จ: {result.Message}")
+                                  ' ไม่ปิด Controls เพราะยังใช้ข้อมูลเก่าได้
+                              End If
+                          Catch uiEx As Exception
+                              Console.WriteLine($"Error updating UI after Excel refresh: {uiEx.Message}")
+                          End Try
+                      End Sub)
+
+        Catch ex As Exception
+            Console.WriteLine($"Error in RefreshExcelDataAsync: {ex.Message}")
+            Me.Invoke(Sub()
+                          ShowExcelLoadingStatus($"รีเฟรชข้อผิดพลาด: {ex.Message}")
+                      End Sub)
+        End Try
+    End Sub
+
+#End Region
 
 End Class

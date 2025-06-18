@@ -23,7 +23,6 @@ Partial Class frmMenu
     <System.Diagnostics.DebuggerStepThrough()>
     Private Sub InitializeComponent()
         components = New ComponentModel.Container()
-        Dim resources As System.ComponentModel.ComponentResourceManager = New System.ComponentModel.ComponentResourceManager(GetType(frmMenu))
         pnlHeader = New Panel()
         lblTitle = New Label()
         picScanIcon = New PictureBox()
@@ -43,11 +42,12 @@ Partial Class frmMenu
         btnSettings = New Button()
         btnExit = New Button()
         btnHistory = New Button()
+        btnTest = New Button()
+        btnCheckUpdate = New Button()
         statusStrip = New StatusStrip()
         toolStripStatusLabel = New ToolStripStatusLabel()
         toolStripProgressBar = New ToolStripProgressBar()
         timerStatus = New Timer(components)
-        btnTest = New Button()
         pnlHeader.SuspendLayout()
         CType(picScanIcon, ComponentModel.ISupportInitialize).BeginInit()
         pnlMain.SuspendLayout()
@@ -60,13 +60,13 @@ Partial Class frmMenu
         ' 
         ' pnlHeader
         ' 
-        pnlHeader.BackColor = Color.FromArgb(CByte(41), CByte(128), CByte(185))
+        pnlHeader.BackColor = Color.FromArgb(CByte(52), CByte(152), CByte(219))
         pnlHeader.Controls.Add(lblTitle)
         pnlHeader.Controls.Add(picScanIcon)
         pnlHeader.Dock = DockStyle.Top
         pnlHeader.Location = New Point(0, 0)
         pnlHeader.Name = "pnlHeader"
-        pnlHeader.Size = New Size(600, 80)
+        pnlHeader.Size = New Size(680, 80)
         pnlHeader.TabIndex = 0
         ' 
         ' lblTitle
@@ -76,31 +76,29 @@ Partial Class frmMenu
         lblTitle.ForeColor = Color.White
         lblTitle.Location = New Point(80, 25)
         lblTitle.Name = "lblTitle"
-        lblTitle.Size = New Size(292, 32)
+        lblTitle.Size = New Size(286, 32)
         lblTitle.TabIndex = 1
         lblTitle.Text = "QR Code Scanner System"
         ' 
         ' picScanIcon
         ' 
         picScanIcon.BackColor = Color.White
-        picScanIcon.Image = CType(resources.GetObject("picScanIcon.Image"), Image)
         picScanIcon.Location = New Point(20, 20)
         picScanIcon.Name = "picScanIcon"
         picScanIcon.Size = New Size(40, 40)
-        picScanIcon.SizeMode = PictureBoxSizeMode.Zoom
         picScanIcon.TabIndex = 0
         picScanIcon.TabStop = False
         ' 
         ' pnlMain
         ' 
-        pnlMain.BackColor = Color.FromArgb(CByte(248), CByte(249), CByte(250))
+        pnlMain.BackColor = Color.White
         pnlMain.Controls.Add(grpBarcodeInfo)
         pnlMain.Controls.Add(grpStatus)
         pnlMain.Dock = DockStyle.Fill
         pnlMain.Location = New Point(0, 80)
         pnlMain.Name = "pnlMain"
         pnlMain.Padding = New Padding(20)
-        pnlMain.Size = New Size(600, 320)
+        pnlMain.Size = New Size(680, 300)
         pnlMain.TabIndex = 1
         ' 
         ' grpBarcodeInfo
@@ -110,65 +108,62 @@ Partial Class frmMenu
         grpBarcodeInfo.Controls.Add(lblBarcode)
         grpBarcodeInfo.Controls.Add(lblLastScanned)
         grpBarcodeInfo.Controls.Add(lblScanTime)
-        grpBarcodeInfo.Font = New Font("Segoe UI", 10F)
-        grpBarcodeInfo.ForeColor = Color.FromArgb(CByte(52), CByte(73), CByte(94))
+        grpBarcodeInfo.Font = New Font("Segoe UI", 12F, FontStyle.Bold)
         grpBarcodeInfo.Location = New Point(20, 20)
         grpBarcodeInfo.Name = "grpBarcodeInfo"
-        grpBarcodeInfo.Size = New Size(560, 140)
+        grpBarcodeInfo.Size = New Size(640, 130)
         grpBarcodeInfo.TabIndex = 0
         grpBarcodeInfo.TabStop = False
-        grpBarcodeInfo.Text = "📊 Barcode Information"
+        grpBarcodeInfo.Text = "ข้อมูล QR Code"
         ' 
         ' lblBarcodeValue
         ' 
-        lblBarcodeValue.Font = New Font("Consolas", 14F, FontStyle.Bold)
+        lblBarcodeValue.AutoSize = True
+        lblBarcodeValue.Font = New Font("Segoe UI", 11F)
         lblBarcodeValue.ForeColor = Color.FromArgb(CByte(46), CByte(125), CByte(50))
-        lblBarcodeValue.Location = New Point(20, 80)
+        lblBarcodeValue.Location = New Point(20, 85)
         lblBarcodeValue.Name = "lblBarcodeValue"
-        lblBarcodeValue.Size = New Size(520, 25)
+        lblBarcodeValue.Size = New Size(135, 20)
         lblBarcodeValue.TabIndex = 4
         lblBarcodeValue.Text = "No barcode scanned"
-        lblBarcodeValue.TextAlign = ContentAlignment.MiddleCenter
         ' 
         ' txtBarcode
         ' 
-        txtBarcode.Font = New Font("Consolas", 12F)
-        txtBarcode.Location = New Point(120, 40)
+        txtBarcode.Font = New Font("Segoe UI", 11F)
+        txtBarcode.Location = New Point(120, 35)
         txtBarcode.Name = "txtBarcode"
-        txtBarcode.ReadOnly = True
-        txtBarcode.Size = New Size(300, 26)
+        txtBarcode.Size = New Size(500, 27)
         txtBarcode.TabIndex = 1
-        txtBarcode.TextAlign = HorizontalAlignment.Center
+        txtBarcode.ReadOnly = True
         ' 
         ' lblBarcode
         ' 
         lblBarcode.AutoSize = True
-        lblBarcode.Font = New Font("Segoe UI", 10F)
-        lblBarcode.Location = New Point(20, 45)
+        lblBarcode.Font = New Font("Segoe UI", 11F)
+        lblBarcode.Location = New Point(20, 38)
         lblBarcode.Name = "lblBarcode"
-        lblBarcode.Size = New Size(94, 19)
+        lblBarcode.Size = New Size(94, 20)
         lblBarcode.TabIndex = 0
-        lblBarcode.Text = "Barcode Data:"
+        lblBarcode.Text = "QR Code/รหัส:"
         ' 
         ' lblLastScanned
         ' 
         lblLastScanned.AutoSize = True
-        lblLastScanned.Font = New Font("Segoe UI", 9F)
-        lblLastScanned.ForeColor = Color.FromArgb(CByte(108), CByte(117), CByte(125))
-        lblLastScanned.Location = New Point(20, 110)
+        lblLastScanned.Font = New Font("Segoe UI", 10F)
+        lblLastScanned.Location = New Point(280, 87)
         lblLastScanned.Name = "lblLastScanned"
-        lblLastScanned.Size = New Size(94, 15)
+        lblLastScanned.Size = New Size(102, 19)
         lblLastScanned.TabIndex = 2
-        lblLastScanned.Text = "Last Scanned At:"
+        lblLastScanned.Text = "สแกนล่าสุดเมื่อ:"
         ' 
         ' lblScanTime
         ' 
         lblScanTime.AutoSize = True
-        lblScanTime.Font = New Font("Segoe UI", 9F, FontStyle.Bold)
-        lblScanTime.ForeColor = Color.FromArgb(CByte(108), CByte(117), CByte(125))
-        lblScanTime.Location = New Point(120, 110)
+        lblScanTime.Font = New Font("Segoe UI", 10F)
+        lblScanTime.ForeColor = Color.FromArgb(CByte(255), CByte(159), CByte(67))
+        lblScanTime.Location = New Point(390, 87)
         lblScanTime.Name = "lblScanTime"
-        lblScanTime.Size = New Size(90, 15)
+        lblScanTime.Size = New Size(97, 19)
         lblScanTime.TabIndex = 3
         lblScanTime.Text = "Never scanned"
         ' 
@@ -177,25 +172,24 @@ Partial Class frmMenu
         grpStatus.Controls.Add(lblStatusValue)
         grpStatus.Controls.Add(picStatusIcon)
         grpStatus.Controls.Add(lblStatus)
-        grpStatus.Font = New Font("Segoe UI", 10F)
-        grpStatus.ForeColor = Color.FromArgb(CByte(52), CByte(73), CByte(94))
-        grpStatus.Location = New Point(20, 180)
+        grpStatus.Font = New Font("Segoe UI", 12F, FontStyle.Bold)
+        grpStatus.Location = New Point(20, 170)
         grpStatus.Name = "grpStatus"
-        grpStatus.Size = New Size(560, 80)
+        grpStatus.Size = New Size(640, 100)
         grpStatus.TabIndex = 1
         grpStatus.TabStop = False
-        grpStatus.Text = "🔍 Scanner Status"
+        grpStatus.Text = "สถานะ"
         ' 
         ' lblStatusValue
         ' 
+        lblStatusValue.AutoSize = True
         lblStatusValue.Font = New Font("Segoe UI", 11F, FontStyle.Bold)
         lblStatusValue.ForeColor = Color.FromArgb(CByte(255), CByte(159), CByte(67))
-        lblStatusValue.Location = New Point(120, 35)
+        lblStatusValue.Location = New Point(120, 38)
         lblStatusValue.Name = "lblStatusValue"
-        lblStatusValue.Size = New Size(300, 25)
+        lblStatusValue.Size = New Size(119, 20)
         lblStatusValue.TabIndex = 2
         lblStatusValue.Text = "Ready to scan..."
-        lblStatusValue.TextAlign = ContentAlignment.MiddleLeft
         ' 
         ' picStatusIcon
         ' 
@@ -224,11 +218,12 @@ Partial Class frmMenu
         pnlButtons.Controls.Add(btnExit)
         pnlButtons.Controls.Add(btnHistory)
         pnlButtons.Controls.Add(btnTest)
+        pnlButtons.Controls.Add(btnCheckUpdate)
         pnlButtons.Dock = DockStyle.Bottom
         pnlButtons.Location = New Point(0, 400)
         pnlButtons.Name = "pnlButtons"
         pnlButtons.Padding = New Padding(20, 10, 20, 10)
-        pnlButtons.Size = New Size(600, 60)
+        pnlButtons.Size = New Size(650, 60)
         pnlButtons.TabIndex = 2
         ' 
         ' btnClear
@@ -245,6 +240,20 @@ Partial Class frmMenu
         btnClear.Text = "🗑️ Clear"
         btnClear.UseVisualStyleBackColor = False
         ' 
+        ' btnTest
+        ' 
+        btnTest.BackColor = Color.FromArgb(CByte(52), CByte(152), CByte(219))
+        btnTest.FlatAppearance.BorderSize = 0
+        btnTest.FlatStyle = FlatStyle.Flat
+        btnTest.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
+        btnTest.ForeColor = Color.White
+        btnTest.Location = New Point(130, 15)
+        btnTest.Name = "btnTest"
+        btnTest.Size = New Size(100, 35)
+        btnTest.TabIndex = 4
+        btnTest.Text = "🧪 ทดสอบ"
+        btnTest.UseVisualStyleBackColor = False
+        ' 
         ' btnSettings
         ' 
         btnSettings.BackColor = Color.FromArgb(CByte(52), CByte(152), CByte(219))
@@ -252,26 +261,26 @@ Partial Class frmMenu
         btnSettings.FlatStyle = FlatStyle.Flat
         btnSettings.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
         btnSettings.ForeColor = Color.White
-        btnSettings.Location = New Point(250, 15)
+        btnSettings.Location = New Point(240, 15)
         btnSettings.Name = "btnSettings"
         btnSettings.Size = New Size(100, 35)
         btnSettings.TabIndex = 1
         btnSettings.Text = "⚙️ Settings"
         btnSettings.UseVisualStyleBackColor = False
         ' 
-        ' btnExit
+        ' btnCheckUpdate
         ' 
-        btnExit.BackColor = Color.FromArgb(CByte(231), CByte(76), CByte(60))
-        btnExit.FlatAppearance.BorderSize = 0
-        btnExit.FlatStyle = FlatStyle.Flat
-        btnExit.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
-        btnExit.ForeColor = Color.White
-        btnExit.Location = New Point(480, 15)
-        btnExit.Name = "btnExit"
-        btnExit.Size = New Size(100, 35)
-        btnExit.TabIndex = 2
-        btnExit.Text = "❌ Exit"
-        btnExit.UseVisualStyleBackColor = False
+        btnCheckUpdate.BackColor = Color.FromArgb(CByte(155), CByte(89), CByte(182))
+        btnCheckUpdate.FlatAppearance.BorderSize = 0
+        btnCheckUpdate.FlatStyle = FlatStyle.Flat
+        btnCheckUpdate.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
+        btnCheckUpdate.ForeColor = Color.White
+        btnCheckUpdate.Location = New Point(350, 15)
+        btnCheckUpdate.Name = "btnCheckUpdate"
+        btnCheckUpdate.Size = New Size(100, 35)
+        btnCheckUpdate.TabIndex = 5
+        btnCheckUpdate.Text = "🔄 Update"
+        btnCheckUpdate.UseVisualStyleBackColor = False
         ' 
         ' btnHistory
         ' 
@@ -280,26 +289,26 @@ Partial Class frmMenu
         btnHistory.FlatStyle = FlatStyle.Flat
         btnHistory.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
         btnHistory.ForeColor = Color.White
-        btnHistory.Location = New Point(360, 15)
+        btnHistory.Location = New Point(460, 15)
         btnHistory.Name = "btnHistory"
         btnHistory.Size = New Size(100, 35)
         btnHistory.TabIndex = 3
         btnHistory.Text = "📋 ประวัติ"
         btnHistory.UseVisualStyleBackColor = False
         ' 
-        ' btnTest
+        ' btnExit
         ' 
-        btnTest.BackColor = Color.FromArgb(CByte(52), CByte(152), CByte(219))
-        btnTest.FlatAppearance.BorderSize = 0
-        btnTest.FlatStyle = FlatStyle.Flat
-        btnTest.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
-        btnTest.ForeColor = Color.White
-        btnTest.Location = New Point(140, 15)
-        btnTest.Name = "btnTest"
-        btnTest.Size = New Size(100, 35)
-        btnTest.TabIndex = 4
-        btnTest.Text = "🧪 ทดสอบ"
-        btnTest.UseVisualStyleBackColor = False
+        btnExit.BackColor = Color.FromArgb(CByte(231), CByte(76), CByte(60))
+        btnExit.FlatAppearance.BorderSize = 0
+        btnExit.FlatStyle = FlatStyle.Flat
+        btnExit.Font = New Font("Segoe UI", 10F, FontStyle.Bold)
+        btnExit.ForeColor = Color.White
+        btnExit.Location = New Point(570, 15)
+        btnExit.Name = "btnExit"
+        btnExit.Size = New Size(100, 35)
+        btnExit.TabIndex = 2
+        btnExit.Text = "❌ Exit"
+        btnExit.UseVisualStyleBackColor = False
         ' 
         ' statusStrip
         ' 
@@ -307,7 +316,7 @@ Partial Class frmMenu
         statusStrip.Items.AddRange(New ToolStripItem() {toolStripStatusLabel, toolStripProgressBar})
         statusStrip.Location = New Point(0, 460)
         statusStrip.Name = "statusStrip"
-        statusStrip.Size = New Size(600, 22)
+        statusStrip.Size = New Size(680, 22)
         statusStrip.TabIndex = 3
         statusStrip.Text = "StatusStrip1"
         ' 
@@ -334,7 +343,7 @@ Partial Class frmMenu
         AutoScaleDimensions = New SizeF(7F, 15F)
         AutoScaleMode = AutoScaleMode.Font
         BackColor = Color.White
-        ClientSize = New Size(600, 482)
+        ClientSize = New Size(680, 482)
         Controls.Add(pnlMain)
         Controls.Add(pnlButtons)
         Controls.Add(pnlHeader)
@@ -353,7 +362,7 @@ Partial Class frmMenu
         grpBarcodeInfo.PerformLayout()
         grpStatus.ResumeLayout(False)
         grpStatus.PerformLayout()
-        CType(picStatusIcon, ComponentModel.ISupportInitialize).EndInit()
+        CType(picStatusIcon, ComponentModel.ISupportInitialize).BeginInit()
         pnlButtons.ResumeLayout(False)
         statusStrip.ResumeLayout(False)
         statusStrip.PerformLayout()
@@ -386,5 +395,6 @@ Partial Class frmMenu
     Friend WithEvents timerStatus As Timer
     Friend WithEvents btnHistory As Button
     Friend WithEvents btnTest As Button
+    Friend WithEvents btnCheckUpdate As Button
 
 End Class

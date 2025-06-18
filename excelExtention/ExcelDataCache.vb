@@ -84,7 +84,7 @@ Public Class ExcelDataCache
     End Property
     
     ''' <summary>
-    ''' โหลดข้อมูล Excel ทั้งหมดเข้า Memory
+    ''' โหลดข้อมูล Excel ทั้งหมดเข้า Memory (ฟังก์ชันเดิม)
     ''' </summary>
     ''' <param name="excelPath">เส้นทางไฟล์ Excel</param>
     ''' <returns>ผลลัพธ์การโหลด</returns>
@@ -118,7 +118,7 @@ Public Class ExcelDataCache
                 
                 Dim elapsedTime = DateTime.Now - startTime
                 result.IsSuccess = True
-                result.Message = $"โหลดข้อมูล {_excelData.Count} แถว สำเร็จ (ใช้เวลา {elapsedTime.TotalSeconds:F2} วินาที)"
+                result.Message = $"โหลดข้อมูล {_excelData.Count:N0} แถว สำเร็จ (ใช้เวลา {elapsedTime.TotalSeconds:F2} วินาที)"
                 result.Data = _excelData
                 
                 Console.WriteLine(result.Message)
@@ -135,6 +135,94 @@ Public Class ExcelDataCache
             Console.WriteLine($"Error in LoadExcelData: {ex.Message}")
         Finally
             _isLoading = False
+        End Try
+        
+        Return result
+    End Function
+    
+    ''' <summary>
+    ''' โหลดข้อมูล Excel ทั้งหมดเข้า Memory พร้อม Progress Reporting
+    ''' </summary>
+    ''' <param name="excelPath">เส้นทางไฟล์ Excel</param>
+    ''' <param name="progress">Progress Reporter</param>
+    ''' <returns>ผลลัพธ์การโหลดพร้อมเวลาที่ใช้</returns>
+    Public Function LoadExcelDataWithProgress(excelPath As String, progress As IProgress(Of Object)) As LoadResultWithTime
+        Dim result As New LoadResultWithTime()
+        Dim startTime = DateTime.Now
+        
+        Try
+            ' ตรวจสอบว่ากำลังโหลดอยู่หรือไม่
+            If _isLoading Then
+                result.IsSuccess = False
+                result.Message = "กำลังโหลดข้อมูลอยู่ กรุณารอสักครู่"
+                Return result
+            End If
+            
+            Console.WriteLine($"เริ่มโหลดข้อมูล Excel พร้อม Progress: {Path.GetFileName(excelPath)}")
+            _isLoading = True
+            
+            ' เคลียร์ข้อมูลเก่า
+            _excelData.Clear()
+            _isLoaded = False
+            
+            ' รายงาน Progress เริ่มต้น
+            progress?.Report(New With {
+                .Message = "กำลังเปิดไฟล์ Excel...",
+                .ProcessedRows = 0,
+                .TotalRows = 0
+            })
+            
+            ' โหลดข้อมูลใหม่พร้อม Progress
+            Dim loadResult = ExcelUtility.LoadDataFromExcelWithProgress(excelPath, progress)
+            
+            If loadResult.IsSuccess Then
+                _excelData = loadResult.Data
+                _excelFilePath = excelPath
+                _isLoaded = True
+                _loadedTime = DateTime.Now
+                
+                Dim elapsedTime = DateTime.Now - startTime
+                result.IsSuccess = True
+                result.Message = $"โหลดข้อมูล {_excelData.Count:N0} แถว สำเร็จ"
+                result.Data = _excelData
+                result.LoadTimeSeconds = elapsedTime.TotalSeconds
+                
+                ' รายงาน Progress สำเร็จ
+                progress?.Report(New With {
+                    .Message = "โหลดข้อมูลสำเร็จ",
+                    .ProcessedRows = _excelData.Count,
+                    .TotalRows = _excelData.Count
+                })
+                
+                Console.WriteLine($"{result.Message} (ใช้เวลา {elapsedTime.TotalSeconds:F2} วินาที)")
+            Else
+                result.IsSuccess = False
+                result.Message = loadResult.ErrorMessage
+                result.ErrorMessage = loadResult.ErrorMessage
+                
+                ' รายงาน Progress ล้มเหลว
+                progress?.Report(New With {
+                    .Message = $"โหลดข้อมูลล้มเหลว: {loadResult.ErrorMessage}",
+                    .ProcessedRows = 0,
+                    .TotalRows = 0
+                })
+            End If
+            
+        Catch ex As Exception
+            result.IsSuccess = False
+            result.Message = $"เกิดข้อผิดพลาดในการโหลดข้อมูล: {ex.Message}"
+            result.ErrorMessage = ex.Message
+            Console.WriteLine($"Error in LoadExcelDataWithProgress: {ex.Message}")
+            
+            ' รายงาน Progress ข้อผิดพลาด
+            progress?.Report(New With {
+                .Message = $"เกิดข้อผิดพลาด: {ex.Message}",
+                .ProcessedRows = 0,
+                .TotalRows = 0
+            })
+        Finally
+            _isLoading = False
+            result.LoadTimeSeconds = (DateTime.Now - startTime).TotalSeconds
         End Try
         
         Return result
@@ -245,19 +333,18 @@ Public Class ExcelDataCache
     End Function
     
     ''' <summary>
-    ''' รีเฟรชข้อมูล (โหลดใหม่จากไฟล์เดิม)
+    ''' รีเฟรชข้อมูล Excel
     ''' </summary>
     ''' <returns>ผลลัพธ์การรีเฟรช</returns>
     Public Function RefreshData() As LoadResult
         If String.IsNullOrEmpty(_excelFilePath) Then
             Return New LoadResult() With {
                 .IsSuccess = False,
-                .Message = "ไม่มีไฟล์ Excel ที่จะรีเฟรช กรุณาโหลดข้อมูลใหม่",
-                .ErrorMessage = "No file path available"
+                .Message = "ไม่พบเส้นทางไฟล์ Excel ที่จะรีเฟรช",
+                .ErrorMessage = "ไม่พบเส้นทางไฟล์ Excel"
             }
         End If
         
-        Console.WriteLine("กำลังรีเฟรชข้อมูล Excel...")
         Return LoadExcelData(_excelFilePath)
     End Function
     
@@ -283,34 +370,70 @@ Public Class ExcelDataCache
     End Sub
     
     ''' <summary>
-    ''' ได้ข้อมูลสถิติการใช้งาน Memory
+    ''' ดึงสถิติการใช้ Memory
     ''' </summary>
-    ''' <returns>ข้อมูลสถิติ</returns>
+    ''' <returns>ข้อความสถิติ</returns>
     Public Function GetMemoryStats() As String
         Try
-            Dim memoryUsed As Long = GC.GetTotalMemory(False)
-            Dim memoryMB As Double = memoryUsed / 1024 / 1024
+            Dim memoryUsed = GC.GetTotalMemory(False)
+            Dim memoryMB = memoryUsed / 1024 / 1024
             
-            Return $"ข้อมูลใน Memory: {_excelData.Count} แถว" & vbNewLine &
-                   $"หน่วยความจำที่ใช้: {memoryMB:F2} MB" & vbNewLine &
-                   $"สถานะ: {If(_isLoaded, "โหลดแล้ว", "ยังไม่โหลด")}" & vbNewLine &
-                   $"โหลดเมื่อ: {If(_isLoaded, _loadedTime.ToString("dd/MM/yyyy HH:mm:ss"), "ยังไม่ได้โหลด")}"
+            Return $"Excel Cache: {_excelData.Count:N0} แถว, ใช้ Memory: {memoryMB:F1} MB, อัพเดท: {_loadedTime:yyyy-MM-dd HH:mm:ss}"
         Catch ex As Exception
-            Return $"ไม่สามารถดูสถิติได้: {ex.Message}"
+            Return $"ไม่สามารถดึงสถิติ Memory ได้: {ex.Message}"
         End Try
     End Function
     
     ''' <summary>
-    ''' ตรวจสอบว่าต้องรีเฟรชข้อมูลหรือไม่ (ตามเวลา)
+    ''' ตรวจสอบว่าควรรีเฟรชข้อมูลหรือไม่
     ''' </summary>
     ''' <param name="maxAgeMinutes">อายุสูงสุดของข้อมูลในหน่วยนาที</param>
     ''' <returns>True ถ้าควรรีเฟรช</returns>
-    Public Function ShouldRefresh(Optional maxAgeMinutes As Integer = 60) As Boolean
+    Public Function ShouldRefresh(maxAgeMinutes As Integer) As Boolean
         If Not _isLoaded Then
             Return True
         End If
         
         Dim age = DateTime.Now - _loadedTime
         Return age.TotalMinutes > maxAgeMinutes
+    End Function
+End Class
+
+''' <summary>
+''' คลาสผลลัพธ์การโหลดข้อมูล Excel พร้อมเวลาที่ใช้
+''' </summary>
+Public Class LoadResultWithTime
+    Inherits LoadResult
+    
+    Private _loadTimeSeconds As Double = 0
+    
+    ''' <summary>
+    ''' เวลาที่ใช้ในการโหลดข้อมูล (วินาที)
+    ''' </summary>
+    Public Property LoadTimeSeconds() As Double
+        Get
+            Return _loadTimeSeconds
+        End Get
+        Set(value As Double)
+            _loadTimeSeconds = value
+        End Set
+    End Property
+    
+    ''' <summary>
+    ''' เวลาที่ใช้ในการโหลดข้อมูล (มิลลิวินาที)
+    ''' </summary>
+    Public ReadOnly Property LoadTimeMs() As Double
+        Get
+            Return _loadTimeSeconds * 1000
+        End Get
+    End Property
+    
+    Public Sub New()
+        MyBase.New()
+    End Sub
+    
+    Public Overrides Function ToString() As String
+        Dim baseString = MyBase.ToString()
+        Return $"{baseString} (ใช้เวลา {_loadTimeSeconds:F2} วินาที)"
     End Function
 End Class

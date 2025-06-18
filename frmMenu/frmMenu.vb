@@ -5,6 +5,12 @@ Imports System.IO
 Imports System.Xml
 Imports System.Data.SqlClient
 Imports System.Configuration
+Imports System.Threading
+Imports System.Threading.Tasks
+Imports System.Diagnostics
+Imports System.Text
+Imports System.Net.Http
+Imports System.Net.Http.Headers
 
 Public Class frmMenu
     Private Const WH_KEYBOARD_LL As Integer = 13
@@ -51,11 +57,82 @@ Public Class frmMenu
         LoadSettingsFromConfig()
         ApplyThemeSettings()
         InitializeDatabase()
-        UpdateStatusBar("พร้อมรับการสแกน QR Code")
 
-        ' อัปเดตชื่อโปรแกรมด้วยเวอร์ชันจาก Assembly
+        ' ตรวจสอบและซิงค์ไฟล์ version.txt กับ Assembly version อัตโนมัติ
+        UpdateManager.InitializeVersionFile()
+
+        ' แสดงข้อมูลเวอร์ชันใน Console (สำหรับ debug)
+        Dim versionCheck = UpdateManager.CheckVersionConsistency()
+        Console.WriteLine($"Version Check: {versionCheck}")
+
+        ' เช็คการอัปเดตในพื้นหลัง
+        CheckForUpdatesAsync()
+
+        UpdateStatusBar("พร้อมรับการสแกน QR Code")
         UpdateFormTitleWithVersion()
     End Sub
+
+
+
+    Private Async Sub CheckForUpdatesAsync()
+        Try
+            Await Task.Run(Sub()
+                               Thread.Sleep(2000) ' รอให้โปรแกรมโหลดเสร็จก่อน
+
+                               Dim result = UpdateManager.CheckForUpdates()
+
+                               Me.Invoke(Sub()
+                                             If result.HasUpdate Then
+                                                 ShowUpdateDialog(result)
+                                             ElseIf Not String.IsNullOrEmpty(result.ErrorMessage) Then
+                                                 Console.WriteLine($"Update check error: {result.ErrorMessage}")
+                                             End If
+                                         End Sub)
+                           End Sub)
+
+        Catch ex As Exception
+            Console.WriteLine($"Error checking for updates: {ex.Message}")
+        End Try
+    End Sub
+
+    Private Sub ShowUpdateDialog(result As UpdateCheckResult)
+        Dim message = $"มีเวอร์ชันใหม่พร้อมใช้งาน!" & vbNewLine & vbNewLine &
+                  $"เวอร์ชันปัจจุบัน: {result.CurrentVersion}" & vbNewLine &
+                  $"เวอร์ชันใหม่: {result.NewVersion}" & vbNewLine & vbNewLine &
+                  "คุณต้องการอัพเดทตอนนี้หรือไม่?"
+
+        Dim dialogResult = MessageBox.Show(message, "อัพเดทโปรแกรม",
+                                      MessageBoxButtons.YesNo,
+                                      MessageBoxIcon.Information)
+
+        If dialogResult = DialogResult.Yes Then
+            If UpdateManager.PerformUpdate(result.UpdatePath) Then
+                MessageBox.Show("กำลังอัพเดทโปรแกรม...", "อัพเดท", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            End If
+        End If
+    End Sub
+
+    Private Sub btnCheckUpdate_Click(sender As Object, e As EventArgs) Handles btnCheckUpdate.Click
+    Try
+        UpdateStatusBar("กำลังตรวจสอบอัพเดท...")
+        
+        Dim result = UpdateManager.CheckForUpdates()
+        
+        If result.HasUpdate Then
+            ShowUpdateDialog(result)
+        ElseIf String.IsNullOrEmpty(result.ErrorMessage) Then
+            MessageBox.Show("คุณใช้เวอร์ชันล่าสุดอยู่แล้ว", "ตรวจสอบอัพเดท", MessageBoxButtons.OK, MessageBoxIcon.Information)
+        Else
+            MessageBox.Show($"ไม่สามารถตรวจสอบอัพเดทได้: {result.ErrorMessage}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        End If
+        
+        UpdateStatusBar("พร้อมรับการสแกน QR Code")
+        
+    Catch ex As Exception
+        MessageBox.Show($"เกิดข้อผิดพลาด: {ex.Message}", "ข้อผิดพลาด", MessageBoxButtons.OK, MessageBoxIcon.Error)
+        UpdateStatusBar("พร้อมรับการสแกน QR Code")
+    End Try
+End Sub
 
     ' Private Sub InitializeUI()
     '     Try

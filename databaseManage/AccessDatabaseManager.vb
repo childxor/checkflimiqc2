@@ -145,7 +145,7 @@ Public Class AccessDatabaseManager
         Catch ex As Exception
             Console.WriteLine($"OleDb creation method also failed: {ex.Message}")
             Throw
-        End Try
+        End Try 
     End Sub
 
     ''' <summary>
